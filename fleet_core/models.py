@@ -103,9 +103,11 @@ class ServiceEvent(models.Model):
     typ_zdarzenia = models.CharField(
         max_length=50,
         choices=[
-            ('INSPEKCJA', 'Inspekcja/Badanie Tech.'),
+            ('INSPEKCJA', 'Inspekcja'),
             ('NAPRAWA', 'Naprawa/Serwis'),
             ('PRZEGLAD', 'Przegląd okresowy'),
+            ('BADANIE_TECH', 'Badanie Techniczne'),  # <-- NOWE
+            ('LEGALIZACJA', 'Legalizacja (Tachograf)'),  # <-- NOWE
         ],
         default='NAPRAWA'
     )
@@ -116,6 +118,26 @@ class ServiceEvent(models.Model):
     class Meta:
         verbose_name = "Zdarzenie Serwisowe"
         verbose_name_plural = "Zdarzenia Serwisowe"
+
+
+# 2. NOWY MODEL: POLISY (Dodaj na samym końcu pliku)
+class InsurancePolicy(models.Model):
+    pojazd = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='policies')
+    numer_polisy = models.CharField(max_length=100, verbose_name="Numer Polisy")
+    ubezpieczyciel = models.CharField(max_length=100, verbose_name="Towarzystwo Ubezpieczeniowe")
+
+    # Daty ważności
+    data_waznosci_oc = models.DateField(verbose_name="Ważność OC")
+    data_waznosci_ac = models.DateField(verbose_name="Ważność AC", null=True, blank=True)
+
+    koszt = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+
+    def __str__(self):
+        return f"Polisa {self.numer_polisy} ({self.pojazd.registration_number})"
+
+    class Meta:
+        verbose_name = "Polisa Ubezpieczeniowa"
+        verbose_name_plural = "Polisy Ubezpieczeniowe"
 
 
 # Master/Server/fleet_core/models.py (DODAJ NA KOŃCU PLIKU)

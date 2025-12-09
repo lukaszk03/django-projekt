@@ -2,7 +2,7 @@
 
 from django.contrib import admin
 # DODANO ServiceEvent, które wcześniej dodaliśmy do models.py
-from .models import FleetCompany, Vehicle, CustomUser, Driver, ServiceEvent, DamageEvent # Dodaj DamageEvent
+from .models import FleetCompany, Vehicle, CustomUser, Driver, ServiceEvent, DamageEvent, InsurancePolicy # Dodaj DamageEvent
 
 # -----------------------------------------------
 # Rejestracja modelu Zdarzenia Serwisowego
@@ -14,6 +14,11 @@ class ServiceEventAdmin(admin.ModelAdmin):
     list_filter = ('typ_zdarzenia', 'data_serwisu')
     search_fields = ('opis', 'pojazd__registration_number')
 
+@admin.register(InsurancePolicy)
+class InsurancePolicyAdmin(admin.ModelAdmin):
+    list_display = ('numer_polisy', 'pojazd', 'ubezpieczyciel', 'data_waznosci_oc')
+    list_filter = ('ubezpieczyciel', 'data_waznosci_oc')
+    
 
 # -----------------------------------------------
 # Rejestracja pozostałych modeli (możesz użyć dekoratora dla spójności)

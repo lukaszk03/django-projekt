@@ -8,9 +8,8 @@ from rest_framework import status
 from django.contrib.auth import authenticate  # Do weryfikacji hasła
 from rest_framework_simplejwt.tokens import RefreshToken  # Do generowania tokenów
 
-from .serializers import VehicleDto, DriverDto, ServiceEventDto, DamageEventDto
-from .models import Vehicle, Driver, ServiceEvent, DamageEvent  # Upewnij się, że ServiceEvent jest zaimportowany
-
+from .serializers import VehicleDto, DriverDto, ServiceEventDto, DamageEventDto, InsurancePolicyDto
+from .models import Vehicle, Driver, ServiceEvent, DamageEvent, InsurancePolicy
 
 # ----------------------------------------------------
 # WIDOKI DLA ZARZĄDZANIA DANYMI FLOTY (Fleet Data ViewSets)
@@ -42,6 +41,10 @@ class DamageEventViewSet(viewsets.ModelViewSet):
     queryset = DamageEvent.objects.select_related('pojazd').all()
     serializer_class = DamageEventDto
 
+# 5. NOWY WIDOK DLA POLIS
+class InsurancePolicyViewSet(viewsets.ModelViewSet):
+    queryset = InsurancePolicy.objects.select_related('pojazd').all()
+    serializer_class = InsurancePolicyDto
 
 # ----------------------------------------------------
 # WIDOK FUNKCYJNY DLA LOGOWANIA Z 2FA (Authentication View)
