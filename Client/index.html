@@ -25,8 +25,18 @@
         .sidebar { width: 250px; background-color: #ffffff; box-shadow: 2px 0 5px rgba(0,0,0,0.1); padding-top: 20px; min-height: 100vh; overflow-y: auto; }
         .menu-item { padding: 12px 20px; cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 14px; color: #333; }
         .menu-item:hover, .menu-item.active { background-color: #e6f7ff; color: #007bff; font-weight: bold; }
-        .menu-subitem { padding: 8px 20px 8px 45px; cursor: pointer; color: #555; font-size: 13px; }
+        
+        /* Zmiana stylu dla podmenu, aby umożliwić wyrównanie kropki */
+        .menu-subitem { 
+            padding: 8px 20px 8px 45px; 
+            cursor: pointer; 
+            color: #555; 
+            font-size: 13px;
+            display: flex; 
+            align-items: center;
+        }
         .menu-subitem:hover, .menu-subitem.active { background-color: #f0f8ff; color: #007bff; }
+        
         .content-area { flex-grow: 1; padding: 20px 40px; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
         h1 { margin: 0; font-size: 24px; }
@@ -90,6 +100,87 @@
         .btn-save { background-color: #007bff; color: white; }
         #delete-btn { background-color: #dc3545; color: white; float: right; }
 
+        /* --- STYLY DLA KOLOROWYCH KÓŁEK W MENU --- */
+        .color-dot {
+            height: 10px;
+            width: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px; /* Odstęp od tekstu */
+        }
+        .dot-policy { background-color: #007bff; }
+        .dot-review { background-color: #28a745; }
+        .dot-inspection { background-color: #ffc107; }
+        .dot-repair { background-color: #dc3545; }
+
+        /* --- STYLY DLA KALENDARZA --- */
+        .calendar-view {
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            text-align: center;
+        }
+        .day-name {
+            font-weight: bold;
+            padding: 10px 0;
+            background-color: #e9ecef;
+            border-radius: 4px;
+        }
+        .calendar-day {
+            min-height: 100px;
+            padding: 5px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            text-align: left;
+        }
+        .calendar-day.current-month {
+            background-color: #ffffff;
+        }
+        .calendar-day:hover {
+            background-color: #e6f7ff;
+        }
+        .calendar-day-number {
+            font-weight: bold;
+            font-size: 1.1em;
+            margin-bottom: 5px;
+            display: block;
+            color: #333;
+        }
+        .event-item {
+            font-size: 0.75em;
+            padding: 2px 4px;
+            margin-top: 2px;
+            border-radius: 3px;
+            color: white;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        /* Kolory dla różnych typów zdarzeń (te same co kropki w menu) */
+        .event-review { background-color: #28a745; } /* Przegląd */
+        .event-inspection { background-color: #ffc107; } /* Badanie/Inspekcja/Legalizacja */
+        .event-policy { background-color: #007bff; } /* Polisa */
+        .event-repair { background-color: #dc3545; } /* Naprawa */
+
     </style>
 </head>
 <body>
@@ -120,11 +211,11 @@
 
             <div class="menu-item" data-view="calendar">📅 Terminarz</div>
 
-            <div class="menu-subitem" data-view="policies">Polisy</div>
-            <div class="menu-subitem" data-view="tech_inspections">Badania techniczne</div>
-            <div class="menu-subitem" data-view="reviews">Przeglądy</div>
-            <div class="menu-subitem" data-view="repairs">Naprawy</div>
-            <div class="menu-subitem" data-view="legalization">Legalizacje</div>
+            <div class="menu-subitem" data-view="policies"><span class="color-dot dot-policy"></span>Polisy</div>
+            <div class="menu-subitem" data-view="tech_inspections"><span class="color-dot dot-inspection"></span>Badania techniczne</div>
+            <div class="menu-subitem" data-view="reviews"><span class="color-dot dot-review"></span>Przeglądy</div>
+            <div class="menu-subitem" data-view="repairs"><span class="color-dot dot-repair"></span>Naprawy</div>
+            <div class="menu-subitem" data-view="legalization"><span class="color-dot dot-inspection"></span>Legalizacje</div>
 
             <div class="menu-item" data-view="leasing">🧾 Leasingi</div>
             <div class="menu-item" data-view="hr_docs">📄 Dokumenty kadrowe</div>
@@ -263,6 +354,7 @@
             'reviews': 'service_events',
             'tech_inspections': 'service_events',
             'legalization': 'service_events',
+            'policies': 'policies', // Dodana polisa
         };
 
         // Dodawanie rekordu
@@ -343,13 +435,18 @@
                     <input type="date" id="data_serwisu_val" value="${record ? record.data_serwisu : ''}" required>
                 `;
             }
-            // Formularz dla Polis (Polisy mają własny endpoint, na razie placeholder)
+            // Formularz dla Polis
             else if (viewName === 'policies') {
-                formHtml = `<p>Formularz dla Polis wymaga osobnego modelu API.</p>
+                formHtml = `
                             <label for="pojazd_id">ID Pojazdu:</label>
                             <input type="number" id="pojazd_id" value="${record ? record.pojazd : ''}" required>
                             <label for="numer_polisy">Numer Polisy:</label>
-                            <input type="text" id="numer_polisy" value="${record ? record.numer_polisy : ''}" required>`;
+                            <input type="text" id="numer_polisy" value="${record ? record.numer_polisy : ''}" required>
+                            <label for="data_waznosci_oc">Data Ważności OC:</label>
+                            <input type="date" id="data_waznosci_oc" value="${record ? record.data_waznosci_oc : ''}" required>
+                            <label for="data_waznosci_ac">Data Ważności AC (opcjonalnie):</label>
+                            <input type="date" id="data_waznosci_ac" value="${record ? record.data_waznosci_ac : ''}">
+                `;
             }
 
 
@@ -397,7 +494,15 @@
                     typ_zdarzenia: document.getElementById('typ_zdarzenia_val').value
                  };
             }
-            // UWAGA: Trzeba dodać logikę zbierania danych dla 'drivers' i 'policies'
+            else if (currentView === 'policies') {
+                 data = {
+                    pojazd: document.getElementById('pojazd_id').value,
+                    numer_polisy: document.getElementById('numer_polisy').value,
+                    data_waznosci_oc: document.getElementById('data_waznosci_oc').value,
+                    data_waznosci_ac: document.getElementById('data_waznosci_ac').value || null // Opcjonalne
+                 };
+            }
+            // UWAGA: Trzeba dodać logikę zbierania danych dla 'drivers'
 
             // 2. Wybór metody i URL
             const method = currentRecordId ? 'PUT' : 'POST';
@@ -603,14 +708,13 @@
             mainContent.innerHTML = `<div class="table-header-sm"><div>Lp.</div><div>Pojazd (Nr Rej.)</div><div>Numer Polisy</div><div>Ważność OC</div><div>Ważność AC</div><div>Akcje</div></div><div id="data-list">Ładowanie danych polis...</div>`;
             const dataListDiv = document.getElementById('data-list');
             try {
-                // TUTAJ TRZEBA ZMIENIĆ ENDPOINT NA np. 'policies/'
                 const response = await fetch(API_BASE + 'policies/', { headers: getAuthHeaders() });
                 if (response.status === 401) { handleLogout(); throw new Error('Sesja wygasła.'); }
                 if (!response.ok) throw new Error(response.statusText);
                 const policies = await response.json();
                 dataListDiv.innerHTML = '';
 
-                // Pętla do renderowania danych polis (w oparciu o strukturę placeholder)
+                // Pętla do renderowania danych polis
                 policies.forEach((policy, index) => {
                     const row = document.createElement('div');
                     row.className = 'table-row-sm';
@@ -619,13 +723,176 @@
                 });
 
             } catch (error) {
-                // PLACHOLDER DLA BRAKU ENDPOINTU POLIS
                 dataListDiv.innerHTML = `<div class="error">
                     Błąd: ${error.message}.
                     <p style="color: #007bff;">Moduł Polisy oczekuje na implementację endpointu API: <strong style="font-size: 1.1em;">/api/policies/</strong>.</p>
                 </div>`;
             }
         }
+
+        // --- NOWA LOGIKA DLA KALENDARZA ---
+        
+        let currentDate = new Date(); // Globalna zmienna do śledzenia aktualnego miesiąca
+
+        /**
+         * Pobiera wszystkie zdarzenia terminowe, które powinny być wyświetlone w kalendarzu.
+         * Musi pobrać ServiceEvents (Inspekcje, Przeglądy, Badania Tech) i Polisy.
+         */
+        async function fetchCalendarEvents() {
+            const headers = getAuthHeaders();
+            let events = [];
+            
+            try {
+                // 1. Pobierz Zdarzenia Serwisowe (które mają datę)
+                const serviceResponse = await fetch(API_BASE + 'service_events/', { headers });
+                if (serviceResponse.ok) {
+                    const serviceEvents = await serviceResponse.json();
+                    serviceEvents.forEach(e => {
+                        // Filtruj tylko te, które są terminami (np. Przegląd, Badanie Tech, Legalizacja)
+                        if (['PRZEGLAD', 'BADANIE_TECH', 'LEGALIZACJA', 'INSPEKCJA'].includes(e.typ_zdarzenia)) {
+                            events.push({
+                                date: e.data_serwisu,
+                                title: `${e.pojazd_nr_rej} - ${e.typ_zdarzenia}`,
+                                type: e.typ_zdarzenia.toLowerCase().includes('przeglad') ? 'review' : 
+                                      e.typ_zdarzenia.toLowerCase().includes('inspekcja') || e.typ_zdarzenia.toLowerCase().includes('badanie') || e.typ_zdarzenia.toLowerCase().includes('legalizacja') ? 'inspection' : 'repair',
+                                record: e
+                            });
+                        }
+                    });
+                }
+
+                // 2. Pobierz Polisy
+                const policyResponse = await fetch(API_BASE + 'policies/', { headers });
+                if (policyResponse.ok) {
+                    const policies = await policyResponse.json();
+                    policies.forEach(p => {
+                        // OC
+                        events.push({
+                            date: p.data_waznosci_oc,
+                            title: `${p.pojazd_nr_rej} - Ważność OC`,
+                            type: 'policy',
+                            record: p
+                        });
+                        // AC (jeśli istnieje)
+                        if (p.data_waznosci_ac && p.data_waznosci_ac !== 'Brak') {
+                             events.push({
+                                date: p.data_waznosci_ac,
+                                title: `${p.pojazd_nr_rej} - Ważność AC`,
+                                type: 'policy',
+                                record: p
+                            });
+                        }
+                    });
+                }
+                
+            } catch (error) {
+                console.error("Błąd ładowania zdarzeń do kalendarza:", error);
+            }
+
+            return events;
+        }
+
+
+        /**
+         * Główna funkcja renderująca Kalendarz
+         */
+        async function renderCalendar() {
+            currentView = 'calendar';
+            viewTitle.textContent = 'Terminarz Floty';
+            // Nie pokazujemy przycisku "DODAJ" dla widoku kalendarza
+            addBtn.style.display = 'none';
+
+            const allEvents = await fetchCalendarEvents();
+            generateCalendarHTML(allEvents, currentDate);
+        }
+
+        /**
+         * Rysuje siatkę kalendarza.
+         * @param {Array} events - Lista zdarzeń do wyświetlenia.
+         * @param {Date} displayDate - Data do określenia wyświetlanego miesiąca.
+         */
+        function generateCalendarHTML(events, displayDate) {
+            mainContent.innerHTML = ''; // Czyścimy zawartość
+            const container = document.createElement('div');
+            container.className = 'calendar-view';
+            
+            const year = displayDate.getFullYear();
+            const month = displayDate.getMonth();
+            
+            // Nazwy miesięcy (polskie)
+            const monthNames = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
+                                "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"];
+
+            // Nagłówek Kalendarza
+            const header = document.createElement('div');
+            header.className = 'calendar-header';
+            header.innerHTML = `
+                <button onclick="changeMonth(-1)">&#9664; Poprzedni</button>
+                <span>${monthNames[month]} ${year}</span>
+                <button onclick="changeMonth(1)">Następny &#9654;</button>
+            `;
+            container.appendChild(header);
+
+            // Siatka Kalendarza
+            const grid = document.createElement('div');
+            grid.className = 'calendar-grid';
+            
+            // Dni tygodnia (polskie, zaczynamy od poniedziałku)
+            const dayNames = ["Pon", "Wto", "Śro", "Czw", "Pią", "Sob", "Nie"];
+            dayNames.forEach(day => {
+                const dayNameDiv = document.createElement('div');
+                dayNameDiv.className = 'day-name';
+                dayNameDiv.textContent = day;
+                grid.appendChild(dayNameDiv);
+            });
+
+            // Ustalanie pierwszego dnia miesiąca i dnia tygodnia (0=Niedziela, 1=Poniedziałek...)
+            const firstDayOfMonth = new Date(year, month, 1);
+            const dayOfWeek = (firstDayOfMonth.getDay() === 0) ? 6 : firstDayOfMonth.getDay() - 1; // Konwersja na: 0=Pon, 6=Nie
+            
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            
+            // Wypełnianie pustymi polami na początku
+            for (let i = 0; i < dayOfWeek; i++) {
+                grid.appendChild(document.createElement('div'));
+            }
+
+            // Dodawanie dni miesiąca
+            for (let day = 1; day <= daysInMonth; day++) {
+                // Generowanie daty w formacie YYYY-MM-DD
+                const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                
+                const dayDiv = document.createElement('div');
+                dayDiv.className = 'calendar-day current-month';
+                dayDiv.setAttribute('data-date', dateString);
+                
+                // Numer dnia
+                dayDiv.innerHTML = `<span class="calendar-day-number">${day}</span>`;
+                
+                // Dodawanie zdarzeń do dnia
+                const dayEvents = events.filter(e => e.date === dateString);
+                dayEvents.forEach(event => {
+                    const eventDiv = document.createElement('div');
+                    eventDiv.className = `event-item event-${event.type}`;
+                    eventDiv.title = event.title;
+                    eventDiv.textContent = event.title;
+                    dayDiv.appendChild(eventDiv);
+                });
+
+                grid.appendChild(dayDiv);
+            }
+            
+            container.appendChild(grid);
+            mainContent.appendChild(container);
+        }
+
+        // Funkcja pomocnicza do zmiany miesiąca (podpięta pod przyciski w HTML)
+        function changeMonth(delta) {
+            currentDate.setMonth(currentDate.getMonth() + delta);
+            renderCalendar();
+        }
+        // Upewnij się, że ta funkcja jest dostępna globalnie, bo jest wywoływana z HTML
+        window.changeMonth = changeMonth; 
 
 
         // --- LOGIKA PRZEŁĄCZANIA WIDOKÓW I AUTORYZACJI ---
@@ -644,12 +911,14 @@
 
             // NOWY WIDOK POLIS
             'policies': renderPolicies,
-
+            
             'damages': renderDamageEvents,
+
+            // WIDOK KALENDARZA (ZMODYFIKOWANY)
+            'calendar': renderCalendar,
 
             // ... (placeholdery bez zmian) ...
             'handover': () => renderPlaceholder('Przekazania'),
-            'calendar': () => renderPlaceholder('Główny Terminarz'),
             'leasing': () => renderPlaceholder('Leasingi'),
             'hr_docs': () => renderPlaceholder('Dokumenty Kadrowe'),
             'settlements': () => renderPlaceholder('Rozliczenia Finansowe'),
@@ -660,6 +929,8 @@
         function renderPlaceholder(title) {
             currentView = title;
             viewTitle.textContent = title;
+            addBtn.style.display = 'inline'; // Domyślnie pokazujemy przycisk DODAJ
+
             mainContent.innerHTML = `<div style="padding: 40px; text-align: center; color: #6c757d;">
                 <h2>${title}</h2>
                 <p>Ten moduł wymaga osobnego endpointu API Django, modelu i logiki biznesowej. Front-end jest gotowy!</p>
@@ -673,10 +944,18 @@
                 activeItem.classList.add('active');
             }
 
+            // Aktywuj także rodzica, jeśli jest podmenu
             const parentView = activeItem.closest('.menu-item');
             if (parentView) {
                 parentView.classList.add('active');
             }
+            
+            // Logika ukrywania/pokazywania przycisku "DODAJ"
+            // Ukrywamy go w kalendarzu, pokazujemy w innych widokach
+            if (viewName !== 'calendar') {
+                addBtn.style.display = 'inline';
+            }
+            // UWAGA: Funkcja renderCalendar sama ustawia `display: none` dla `addBtn`
 
             viewMap[viewName]();
             currentView = viewName;
