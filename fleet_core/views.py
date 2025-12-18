@@ -7,9 +7,9 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth import authenticate  # Do weryfikacji hasła
 from rest_framework_simplejwt.tokens import RefreshToken  # Do generowania tokenów
-
+from django.contrib.auth.models import User
 from .serializers import VehicleDto, DriverDto, ServiceEventDto, DamageEventDto, InsurancePolicyDto
-from .models import Vehicle, Driver, ServiceEvent, DamageEvent, InsurancePolicy
+from .models import Vehicle, Driver, ServiceEvent, DamageEvent, InsurancePolicy, CustomUser
 
 # ----------------------------------------------------
 # WIDOKI DLA ZARZĄDZANIA DANYMI FLOTY (Fleet Data ViewSets)
@@ -90,3 +90,28 @@ def login_view(request):
         {'detail': 'Nieprawidłowa nazwa użytkownika lub hasło.'},
         status=status.HTTP_401_UNAUTHORIZED
     )
+
+# ==================
+# Rejestracja
+#==================
+
+@api_view(['POST'])
+@permission_classes([])  # Dostępne dla każdego
+def register_view(request):
+    username = request.data.get('username')
+    password = request.data.get('password')
+    email = request.data.get('email')
+    rola = request.data.get('rola', 'EMPLOYEE')  # Domyślnie Pracownik
+    first_name = request.data.get('first_name', '')  # Odbieramy imię
+    last_name = request.data.get('last_name', '')  # Odbieramy nazwisko
+
+    if not username or not password:
+        return Response({'detail': 'Nazwa użytkownika i hasło są wymagane.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if CustomUser.objects.filter(username=username).exists():
+        return Response({'detail': 'Użytkownik o tej nazwie już istnieje.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Tworzenie użytkownika
+    user = CustomUser.objects.create_user(username=username, password=password, email=email, rola=rola, first_name=first_name, last_name=last_name)
+
+    return Response({'detail': 'Konto zostało utworzone. Możesz się zalogować.'}, status=status.HTTP_201_CREATED)

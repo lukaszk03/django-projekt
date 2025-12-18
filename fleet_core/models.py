@@ -21,7 +21,16 @@ class FleetCompany(models.Model):
     def __str__(self):
         return self.nazwa
 
-
+FUEL_TYPES = [
+        ('BENZYNA', 'Benzyna'),
+        ('DIESEL', 'Diesel'),
+        ('ELECTRIC', 'Elektryczny'),
+        ('HYBRID', 'Hybryda'),
+        ('PHEV', 'Hybryda Plug-in'),
+        ('LPG', 'LPG'),
+        ('CNG', 'CNG'),
+        ('HYDROGEN', 'Wodorowy'),
+    ]
 # ----------------------------------------------------
 # MODEL POJAZDU Z WALIDACJĄ ZGODNĄ Z ERR-02 i ERR-04
 # ----------------------------------------------------
@@ -33,6 +42,13 @@ class Vehicle(models.Model):
     vin = models.CharField(max_length=17, unique=True, verbose_name="Numer VIN")
     registration_number = models.CharField(max_length=10, db_index=True)
     is_active = models.BooleanField(default=True)
+    # Definicja typów paliwa (możesz to dać nad klasą Vehicle)
+    fuel_type = models.CharField(
+        max_length=20,
+        choices=FUEL_TYPES,
+        default='DIESEL',
+        verbose_name="Rodzaj Paliwa"
+    )
 
     # Przebieg (float wg diagramu)
     przebieg = models.FloatField(default=0.0)
@@ -73,12 +89,27 @@ class Vehicle(models.Model):
 
 # Model Kierowcy 
 class Driver(models.Model):
-    # Relacja OneToOne do CustomUser jest kluczowa!
     user = models.OneToOneField('CustomUser', on_delete=models.CASCADE)
     numer_prawa_jazdy = models.CharField(max_length=50)
     data_waznosci_prawa_jazdy = models.DateField()
+
+    # --- NOWE POLA ---
+    kategorie_prawa_jazdy = models.CharField(
+        max_length=100,
+        default='B',
+        verbose_name="Kategorie (np. B, C)"
+    )
+    data_waznosci_badan = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Ważność badań lekarskich"
+    )
+    # -----------------
+
     aktywny = models.BooleanField(default=True)
 
+    def __str__(self):
+        return f"{self.user.username} - {self.kategorie_prawa_jazdy}"
 
 # Rozszerzony User
 class CustomUser(AbstractUser):

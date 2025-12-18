@@ -7,10 +7,11 @@ from .models import Vehicle, Driver, ServiceEvent, DamageEvent, FleetCompany, In
 # 1. SERIALIZER DLA POJAZDÓW (VehicleDto)
 class VehicleDto(serializers.ModelSerializer):
     company_name = serializers.CharField(source='company.nazwa', read_only=True)
+    fuel_type_display = serializers.CharField(source='get_fuel_type_display', read_only=True)
 
     class Meta:
         model = Vehicle
-        fields = ['id', 'vin', 'registration_number', 'company_name', 'is_active', 'przebieg']
+        fields = ['id', 'vin', 'registration_number', 'company', 'company_name', 'is_active', 'przebieg', 'fuel_type', 'fuel_type_display']
 
 
 # 2. SERIALIZER DLA UŻYTKOWNIKÓW (Kierowców)
@@ -24,6 +25,8 @@ class DriverDto(serializers.ModelSerializer):
             'id',
             'numer_prawa_jazdy',
             'data_waznosci_prawa_jazdy',
+            'kategorie_prawa_jazdy',  # <-- DODAJ TO
+            'data_waznosci_badan',  # <-- DODAJ TO
             'aktywny',
             # Musimy tutaj podać pole z modelu CustomUser przez relację 'user'
             'user_name'

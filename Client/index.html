@@ -17,7 +17,7 @@
         /* --- STYLY DLA LOGOWANIA (pozostają bez zmian) --- */
         .login-container { display: none; justify-content: center; align-items: center; height: 100vh; width: 100%; background-color: #e9ecef; }
         .login-box { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); width: 350px; text-align: center; }
-        .login-box input[type="text"], .login-box input[type="password"] { width: 100%; padding: 10px; margin: 8px 0 15px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .login-box input[type="text"], .login-box input[type="password"], .login-box input[type="email"] { width: 100%; padding: 10px; margin: 8px 0 15px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
         .login-box button { background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-size: 16px; }
 
         /* --- STYLY DLA GŁÓWNEJ APLIKACJI --- */
@@ -192,69 +192,97 @@
 </head>
 <body>
 
-    <div class="login-container" id="login-container">
-        <div class="login-box">
-            <h2>Logowanie do NAVIFLEET</h2>
-            <p style="color: red; height: 1.5em;" id="login-error"></p>
-            <form id="login-form">
-                <input type="text" id="username" placeholder="Nazwa użytkownika" required>
-                <input type="password" id="password" placeholder="Hasło" required>
-                <input type="password" id="pin_2fa" placeholder="PIN 2FA (tylko Admin)" style="display: none;">
-                <button type="submit">Zaloguj</button>
-            </form>
-        </div>
-    </div>
 
-    <div class="main-app" id="main-app">
-        <div class="sidebar">
-            <div style="padding: 10px 20px; font-size: 1.5em; color: #007bff; font-weight: 900;">NAVIFLEET</div>
-            <div class="menu-item active" data-view="vehicles">
-                <span>🚗 Pojazdy</span>
-                <span style="margin-left: auto; background: red; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.8em;">2</span>
-            </div>
-            <div class="menu-item" data-view="drivers">👥 Użytkownicy</div> <div class="menu-item" data-view="handover">⇌ Przekazania</div>
-            <div class="menu-item" data-view="inspection">📜 Inspekcje</div>
-            <div class="menu-item" data-view="damages">⚠️ Szkody</div>
 
-            <div class="menu-item" data-view="calendar">📅 Terminarz</div>
-
-            <div class="menu-subitem" data-view="policies"><span class="color-dot dot-policy"></span>Polisy</div>
-            <div class="menu-subitem" data-view="tech_inspections"><span class="color-dot dot-inspection"></span>Badania techniczne</div>
-            <div class="menu-subitem" data-view="reviews"><span class="color-dot dot-review"></span>Przeglądy</div>
-            <div class="menu-subitem" data-view="repairs"><span class="color-dot dot-repair"></span>Naprawy</div>
-            <div class="menu-subitem" data-view="legalization"><span class="color-dot dot-inspection"></span>Legalizacje</div>
-
-            <div class="menu-item" data-view="leasing">🧾 Leasingi</div>
-            <div class="menu-item" data-view="hr_docs">📄 Dokumenty kadrowe</div>
-            <div class="menu-item" data-view="settlements">💶 Rozliczenia</div>
-            <div class="menu-item" data-view="other">🕒 Pozostałe</div>
-
-            <div class="menu-item" data-view="settings" style="margin-top: 30px;">⚙️ Ustawienia</div>
-            <button id="logout-btn">Wyloguj (rola: <span id="user-role-display"></span>)</button>
-        </div>
-
-        <div class="content-area">
-            <div class="header">
-                <h1 id="view-title">Pojazdy</h1>
-                <button class="btn-add" id="add-btn">➕ DODAJ</button>
-            </div>
-
-            <div class="table-container" id="main-content">
-                </div>
-        </div>
-    </div>
-
-    <div id="data-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn">&times;</span>
-            <h2 id="modal-title">Dodaj nowy rekord</h2>
-            <p style="color: red; height: 1.5em;" id="modal-error"></p>
-            <form id="modal-form">
+        <div class="login-container" id="login-container">
+            <div class="login-box" id="login-box">
+                <h2>Logowanie do NAVIFLEET</h2>
+                <p style="color: red; height: 1.5em;" id="login-error"></p>
+                <form id="login-form">
+                    <input type="text" id="username" placeholder="Nazwa użytkownika" required>
+                    <input type="password" id="password" placeholder="Hasło" required>
+                    <input type="password" id="pin_2fa" placeholder="PIN 2FA (tylko Admin)" style="display: none;">
+                    <button type="submit">Zaloguj</button>
                 </form>
-            <button class="btn-save" id="save-btn">ZAPISZ</button>
-            <button id="delete-btn" style="display: none;">USUŃ</button>
+                <p style="margin-top: 15px; font-size: 0.9em;">
+                    Nie masz konta? <a href="#" onclick="showRegister()">Załóż konto</a>
+                </p>
+            </div>
+
+            <div class="login-box" id="register-box" style="display: none;">
+                <h2>Załóż konto</h2>
+                <p style="color: red; height: 1.5em;" id="register-error"></p>
+                <input type="text" id="reg_first_name" placeholder="Imię" required>
+                <input type="text" id="reg_last_name" placeholder="Nazwisko" required>
+                <input type="text" id="reg_username" placeholder="Nowy login" required>
+                <input type="email" id="reg_email" placeholder="Adres e-mail" required>
+                <input type="password" id="reg_password" placeholder="Nowe hasło" required>
+                <select id="reg_role">
+                    <option value="EMPLOYEE">Pracownik</option>
+                    <option value="DRIVER">Kierowca</option>
+                    <option value="MANAGER">Menedżer Floty</option>
+                </select>
+                <button onclick="handleRegister()" style="width: 100%; padding: 10px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px;">
+                    Zarejestruj się
+                </button>
+                <p style="margin-top: 15px; font-size: 0.9em;">
+                    Masz już konto? <a href="#" onclick="showLogin()">Wróć do logowania</a>
+                </p>
+            </div>
+        </div> <div class="main-app" id="main-app" style="display: none;">
+            <div class="sidebar">
+                <div style="padding: 10px 20px; font-size: 1.5em; color: #007bff; font-weight: 900;">NAVIFLEET</div>
+
+                <div class="menu-item active" data-view="vehicles"><span>🚗 Pojazdy</span></div>
+                <div class="menu-item" data-view="drivers"><i class="fas fa-users"></i> Użytkownicy</div>
+                <div class="menu-item" data-view="handover">⇌ Przekazania</div>
+                <div class="menu-item" data-view="inspection">📜 Inspekcje</div>
+                <div class="menu-item" data-view="damages">⚠️ Szkody</div>
+
+                <div class="menu-item" data-view="calendar">📅 Terminarz</div>
+
+                <div class="menu-subitem" data-view="policies"><span class="color-dot dot-policy"></span>Polisy</div>
+                <div class="menu-subitem" data-view="tech_inspections"><span class="color-dot dot-inspection"></span>Badania techniczne</div>
+                <div class="menu-subitem" data-view="reviews"><span class="color-dot dot-review"></span>Przeglądy</div>
+                <div class="menu-subitem" data-view="repairs"><span class="color-dot dot-repair"></span>Naprawy</div>
+                <div class="menu-subitem" data-view="legalization"><span class="color-dot dot-inspection"></span>Legalizacje</div>
+
+                <div class="menu-item" data-view="leasing">🧾 Leasingi</div>
+                <div class="menu-item" data-view="hr_docs">📄 Dokumenty kadrowe</div>
+                <div class="menu-item" data-view="settlements">💶 Rozliczenia</div>
+                <div class="menu-item" data-view="other">🕒 Pozostałe</div>
+
+                <div class="menu-item" data-view="settings" style="margin-top: 30px;">⚙️ Ustawienia</div>
+
+                <div style="padding: 20px;">
+                    <button id="logout-btn" style="width: 100%;">Wyloguj (rola: <span id="user-role-display"></span>)</button>
+                </div>
+            </div>
+
+            <div class="content-area">
+                <div class="header">
+                    <h1 id="view-title">Pojazdy</h1>
+                    <button class="btn-add" id="add-btn">➕ DODAJ</button>
+                </div>
+
+                <div class="table-container" id="main-content">
+                    </div>
+            </div>
         </div>
-    </div>
+
+        <div id="data-modal" class="modal">
+            <div class="modal-content">
+                <span class="close-btn">&times;</span>
+                <h2 id="modal-title">Dodaj nowy rekord</h2>
+                <p style="color: red; height: 1.5em;" id="modal-error"></p>
+                <form id="modal-form"></form>
+                <div style="margin-top: 20px; display: flex; gap: 10px;">
+                    <button class="btn-save" id="save-btn">ZAPISZ</button>
+                    <button id="delete-btn" style="display: none; background-color: #dc3545; color: white; border: none; padding: 10px; border-radius: 4px;">USUŃ</button>
+                </div>
+            </div>
+        </div>
+
 
 
     <script>
@@ -343,6 +371,53 @@
         }
         loginForm.addEventListener('submit', handleLogin);
 
+        // Funkcje przełączania widoków
+        function showRegister() {
+            // Ukrywamy box logowania, pokazujemy box rejestracji
+            document.getElementById('login-box').style.display = 'none';
+            document.getElementById('register-box').style.display = 'block';
+        }
+
+        function showLogin() {
+            // Ukrywamy box rejestracji, pokazujemy box logowania
+            document.getElementById('login-box').style.display = 'block';
+            document.getElementById('register-box').style.display = 'none';
+        }
+
+        // Obsługa wysyłania rejestracji do Django
+        async function handleRegister() {
+            const username = document.getElementById('reg_username').value;
+            const email = document.getElementById('reg_email').value;
+            const password = document.getElementById('reg_password').value;
+            const rola = document.getElementById('reg_role').value;
+            const first_name = document.getElementById('reg_first_name').value; // NOWE
+            const last_name = document.getElementById('reg_last_name').value;   // NOWE
+            const errorElem = document.getElementById('register-error');
+
+
+            // Reset błędu przed wysłaniem
+            errorElem.textContent = "";
+
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/register/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password, rola, first_name, last_name })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert("Konto utworzone pomyślnie! Teraz możesz się zalogować.");
+                    showLogin(); // Automatyczny powrót do ekranu logowania
+                } else {
+                    // Wyświetlenie błędu z serwera (np. "Użytkownik już istnieje")
+                    errorElem.textContent = data.detail || "Błąd rejestracji";
+                }
+            } catch (error) {
+                errorElem.textContent = "Błąd połączenia z serwerem.";
+            }
+        }
 
         // --- FUNKCJE DLA MODALU (DODAWANIE/EDYCJA/USUNIĘCIE) ---
 
@@ -455,13 +530,29 @@
             }
             // POZOSTAŁA LOGIKA FORMULARZA (EDYCJA ORAZ DODAWANIE W INNYCH WIDOKACH)
             else if (viewName === 'vehicles') {
+                const sel = (val) => (record && record.fuel_type === val) ? 'selected' : '';
                 formHtml = `
                     <label for="reg_num">Nr Rejestracyjny:</label>
                     <input type="text" id="reg_num" value="${record ? record.registration_number : ''}" required>
+
                     <label for="vin_num">VIN:</label>
                     <input type="text" id="vin_num" value="${record ? record.vin : ''}" required>
+
+                    <label for="fuel_type_input">Rodzaj Paliwa:</label>
+                    <select id="fuel_type_input" required>
+                        <option value="BENZYNA" ${sel('BENZYNA')}>Benzyna</option>
+                        <option value="DIESEL" ${sel('DIESEL')}>Diesel</option>
+                        <option value="ELECTRIC" ${sel('ELECTRIC')}>Elektryczny</option>
+                        <option value="HYBRID" ${sel('HYBRID')}>Hybryda</option>
+                        <option value="PHEV" ${sel('PHEV')}>Hybryda Plug-in</option>
+                        <option value="LPG" ${sel('LPG')}>LPG</option>
+                        <option value="CNG" ${sel('CNG')}>CNG</option>
+                        <option value="HYDROGEN" ${sel('HYDROGEN')}>Wodorowy</option>
+                    </select>
+
                     <label for="przebieg_val">Przebieg (km):</label>
                     <input type="number" id="przebieg_val" value="${record ? record.przebieg : ''}" required>
+
                     <label for="company_id">ID Firmy (wymagane):</label>
                     <input type="number" id="company_id" value="${record ? record.company : ''}" required>
                 `;
@@ -480,6 +571,16 @@
                         <option value="W_NAPRAWIE" ${record && record.status_naprawy === 'W_NAPRAWIE' ? 'selected' : ''}>W naprawie</option>
                         <option value="ZAMKNIETA" ${record && record.status_naprawy === 'ZAMKNIETA' ? 'selected' : ''}>Zamknięta</option>
                     </select>
+                `;
+            }
+            else if (viewName === 'drivers') {
+                formHtml = `
+                    <label>Numer Prawa Jazdy:</label>
+                    <input type="text" id="prawa_jazdy_num" value="${record ? record.numer_prawa_jazdy : ''}">
+                    <label>Kategorie:</label>
+                    <input type="text" id="kat_prawa_jazdy" value="${record ? record.kategorie_prawa_jazdy : 'B'}">
+                    <label>Ważność badań lekarskich:</label>
+                    <input type="date" id="data_badan_val" value="${record ? record.data_waznosci_badan : ''}">
                 `;
             }
             // Logika edycji zdarzenia serwisowego lub polisy - uproszczona (można rozbudować, ale na razie używamy starych formularzy, jeśli to edycja)
@@ -586,6 +687,7 @@
                 data = {
                     registration_number: document.getElementById('reg_num').value,
                     vin: document.getElementById('vin_num').value,
+                    fuel_type: document.getElementById('fuel_type_input').value, // NOWE
                     przebieg: document.getElementById('przebieg_val').value,
                     company: document.getElementById('company_id').value,
                     is_active: true
@@ -697,7 +799,15 @@
         async function renderVehicles() {
              currentView = 'vehicles';
              viewTitle.textContent = 'Pojazdy';
-             mainContent.innerHTML = `<div class="table-header"><div>Lp.</div><div>Nr Rej.</div><div>VIN</div><div>Przebieg</div><div>Firma</div><div>Status</div><div>Akcje</div></div><div id="data-list">Ładowanie pojazdów...</div>`;
+             mainContent.innerHTML = `<div class="table-header" style="grid-template-columns: 50px 1fr 1fr 1fr 1fr 1fr 1fr 120px;">
+                <div>Lp.</div>
+                <div>Nr Rej.</div>
+                <div>VIN</div>
+                <div>Paliwo</div> <div>Przebieg</div>
+                <div>Firma</div>
+                <div>Status</div>
+                <div>Akcje</div>
+                </div><div id="data-list">Ładowanie pojazdów...</div>`;
              const dataListDiv = document.getElementById('data-list');
              try {
                  const response = await fetch(API_BASE + 'vehicles/', { headers: getAuthHeaders() });
@@ -709,11 +819,21 @@
                      const statusColor = vehicle.is_active ? 'green' : '#ffc107';
                      const statusText = vehicle.is_active ? 'Aktywny' : 'Serwis';
                      const companyName = vehicle.company_name || 'Brak Firmy';
+                     const paliwo = vehicle.fuel_type_display || vehicle.fuel_type || '-';
                      const row = document.createElement('div');
                      row.className = 'table-row';
-                     row.innerHTML = `<div>${index + 1}.</div><div>${vehicle.registration_number}</div><div>${vehicle.vin}</div><div>${vehicle.przebieg ? vehicle.przebieg.toLocaleString() : 'N/A'} km</div><div>${companyName}</div><div style="color: ${statusColor}; font-weight: bold;">${statusText}</div><div>${getActionButtons(vehicle, 'vehicles')}</div>`;
-                     dataListDiv.appendChild(row);
-                 });
+                     row.style.gridTemplateColumns = "50px 1fr 1fr 1fr 1fr 1fr 1fr 120px";
+                     row.innerHTML = `
+                     <div>${index + 1}.</div>
+                     <div>${vehicle.registration_number}</div>
+                     <div>${vehicle.vin}</div>
+                     <div>${paliwo}</div> <div>${vehicle.przebieg ? vehicle.przebieg.toLocaleString() : 'N/A'} km</div>
+                     <div>${companyName}</div>
+                     <div style="color: ${statusColor}; font-weight: bold;">${statusText}</div>
+                     <div>${getActionButtons(vehicle, 'vehicles')}</div>
+                 `;
+                 dataListDiv.appendChild(row);
+             });
              } catch (error) {
                  dataListDiv.innerHTML = `<div class="error">Błąd: ${error.message}. Brak danych lub brak autoryzacji.</div>`;
              }
@@ -775,9 +895,111 @@
              }
          }
 
-         // Funkcje dla innych widoków - placeholdery
-         function renderDrivers() { renderPlaceholder('Użytkownicy (Kierowcy)'); }
-         function renderDamageEvents() { renderPlaceholder('Zdarzenia Szkodowe i Awarie'); }
+                 // Funkcje dla innych widoków - placeholdery
+                 // Widok Kierowców
+        async function renderDrivers() {
+            viewTitle.textContent = 'Użytkownicy (Kierowcy)';
+            const token = localStorage.getItem('access_token');
+
+            // Przygotowanie tabeli
+            mainContent.innerHTML = `
+                <div class="table-header" style="grid-template-columns: 50px 1fr 1fr 1fr 1fr 120px 120px;">
+                    <div>Lp.</div>
+                    <div>Kierowca</div>
+                    <div>Nr Pr. Jazdy</div>
+                    <div>Kategorie</div>
+                    <div>Ważność PJ</div>
+                    <div>Badania lek.</div>
+                    <div>Akcje</div>
+                </div>
+                <div id="data-list">Ładowanie...</div>
+            `;
+
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/drivers/', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const drivers = await response.json();
+                const dataListDiv = document.getElementById('data-list');
+                dataListDiv.innerHTML = '';
+
+                drivers.forEach((driver, index) => {
+                    // Sprawdzanie czy badania są aktualne
+                    const dzis = new Date();
+                    const dataBadan = driver.data_waznosci_badan ? new Date(driver.data_waznosci_badan) : null;
+                    const czyPrzeterminowane = dataBadan && dataBadan < dzis;
+
+                    const row = document.createElement('div');
+                    row.className = 'table-row';
+                    row.style.gridTemplateColumns = "50px 1fr 1fr 1fr 1fr 120px 120px";
+                    row.innerHTML = `
+                        <div>${index + 1}.</div>
+                        <div><strong>${driver.user_name}</strong></div>
+                        <div>${driver.numer_prawa_jazdy}</div>
+                        <div>${driver.kategorie_prawa_jazdy || 'B'}</div>
+                        <div>${driver.data_waznosci_prawa_jazdy}</div>
+                        <div style="color: ${czyPrzeterminowane ? 'red' : 'green'}; font-weight: bold;">
+                            ${driver.data_waznosci_badan || 'Brak'}
+                        </div>
+                        <div>${getActionButtons(driver, 'drivers')}</div>
+                    `;
+                    dataListDiv.appendChild(row);
+                });
+            } catch (err) {
+                document.getElementById('data-list').innerHTML = "Błąd ładowania: " + err;
+            }
+        }
+
+        // Widok Szkód
+        async function renderDamageEvents() {
+            viewTitle.textContent = 'Zdarzenia Szkodowe i Awarie';
+            const token = localStorage.getItem('access_token');
+            mainContent.innerHTML = `
+                <div class="table-header" style="grid-template-columns: 50px 120px 1fr 150px 150px 120px;">
+                    <div>Lp.</div>
+                    <div>Nr Rej.</div>
+                    <div>Opis Szkody</div>
+                    <div>Data</div>
+                    <div>Status</div>
+                    <div>Akcje</div>
+                </div>
+                <div id="data-list">Ładowanie szkód...</div>
+            `;
+
+            const dataListDiv = document.getElementById('data-list');
+
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/damage_events/', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const damages = await response.json();
+
+                dataListDiv.innerHTML = '';
+                damages.forEach((damage, index) => {
+                    const statusMap = {
+                        'ZGLOSZONA': { txt: 'Zgłoszona', col: '#ffc107' },
+                        'W_NAPRAWIE': { txt: 'W naprawie', col: '#17a2b8' },
+                        'ZAMKNIETA': { txt: 'Zamknięta', col: '#28a745' }
+                    };
+                    const status = statusMap[damage.status_naprawy] || { txt: damage.status_naprawy, col: '#6c757d' };
+
+                    const row = document.createElement('div');
+                    row.className = 'table-row';
+                    row.style.gridTemplateColumns = "50px 120px 1fr 150px 150px 120px";
+                    row.innerHTML = `
+                        <div>${index + 1}.</div>
+                        <div>${damage.pojazd_nr_rej}</div>
+                        <div>${damage.opis}</div>
+                        <div>${damage.data_zdarzenia}</div>
+                        <div style="color: ${status.col}; font-weight: bold;">${status.txt}</div>
+                        <div>${getActionButtons(damage, 'damages')}</div>
+                    `;
+                    dataListDiv.appendChild(row);
+                });
+            } catch (err) {
+                dataListDiv.innerHTML = `<p style="color:red;">Błąd: ${err.message}</p>`;
+            }
+        }
          function renderPlaceholder(title) {
              currentView = title;
              viewTitle.textContent = title;
@@ -981,12 +1203,11 @@
 
         const viewMap = {
             'vehicles': renderVehicles,
-            'drivers': renderPlaceholder,
-            'handover': renderPlaceholder,
-            'inspection': () => renderServiceEvents('inspection'),
-            'damages': renderPlaceholder,
+            'drivers': renderDrivers,        // Zmienione z renderPlaceholder
+            'damages': renderDamageEvents,   // Zmienione z renderPlaceholder
 
-            'calendar': renderCalendar, // Główny Terminarz
+            'inspection': () => renderServiceEvents('inspection'),
+            'calendar': renderCalendar,
 
             'policies': renderPolicies,
             'tech_inspections': () => renderServiceEvents('tech_inspections'),
@@ -994,6 +1215,8 @@
             'repairs': () => renderServiceEvents('repairs'),
             'legalization': () => renderServiceEvents('legalization'),
 
+            // Reszta może zostać jako placeholder, dopóki nie zrobimy dla nich modeli
+            'handover': renderPlaceholder,
             'leasing': renderPlaceholder,
             'hr_docs': renderPlaceholder,
             'settlements': renderPlaceholder,

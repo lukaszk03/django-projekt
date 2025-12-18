@@ -1,7 +1,7 @@
 # Master/Server/fleet_core/urls.py
 
 # Zmień import widoków
-from .views import VehicleViewSet, DriverViewSet, ServiceEventViewSet, DamageEventViewSet, InsurancePolicyViewSet, login_view
+from .views import VehicleViewSet, DriverViewSet, ServiceEventViewSet, DamageEventViewSet, InsurancePolicyViewSet, login_view, register_view
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
@@ -17,5 +17,6 @@ router.register(r'policies', InsurancePolicyViewSet, basename='policy')
 
 urlpatterns = [
     path('login/', login_view, name='login'),
+    path('register/', register_view, name='register'), # NOWA LINIA
     *router.urls
 ]
