@@ -41,6 +41,9 @@ class Vehicle(models.Model):
     """
     vin = models.CharField(max_length=17, unique=True, verbose_name="Numer VIN")
     registration_number = models.CharField(max_length=10, db_index=True)
+    marka = models.CharField(max_length=100, blank=True, null=True)
+    model = models.CharField(max_length=100, blank=True, null=True)
+    data_pierwszej_rejestracji = models.DateField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
     # Definicja typów paliwa (możesz to dać nad klasą Vehicle)
     fuel_type = models.CharField(
@@ -48,6 +51,14 @@ class Vehicle(models.Model):
         choices=FUEL_TYPES,
         default='DIESEL',
         verbose_name="Rodzaj Paliwa"
+    )
+
+    assigned_user = models.ForeignKey(
+        'CustomUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_vehicles'
     )
 
     # Przebieg (float wg diagramu)

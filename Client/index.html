@@ -262,11 +262,14 @@
             <div class="content-area">
                 <div class="header">
                     <h1 id="view-title">Pojazdy</h1>
-                    <button class="btn-add" id="add-btn">➕ DODAJ</button>
-                </div>
 
-                <div class="table-container" id="main-content">
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="table-search" placeholder="Szukaj..." onkeyup="filterTable()"
+                               style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 200px;">
+
+                        <button class="btn-add" id="add-btn">➕ DODAJ</button>
                     </div>
+                </div>
             </div>
         </div>
 
@@ -499,7 +502,6 @@
             if (isCalendarEventView && !currentRecordId) {
                 modalTitle.textContent = `Dodaj Nowy Termin/Zdarzenie`;
 
-                // Dynamiczne pobranie pojazdów do dropdown
                 const vehicles = await fetchVehicles();
                 const vehicleOptions = vehicles.map(v => `<option value="${v.id}">${v.registration_number} (ID: ${v.id})</option>`).join('');
 
@@ -521,22 +523,30 @@
                         ${vehicleOptions}
                     </select>
 
-                    <div id="dynamic-fields-container">
-                        </div>
+                    <div id="dynamic-fields-container"></div>
 
                     <label for="data_terminu">Data Terminu (Ważności/Serwisu):</label>
                     <input type="date" id="data_terminu" required>
                 `;
             }
-            // POZOSTAŁA LOGIKA FORMULARZA (EDYCJA ORAZ DODAWANIE W INNYCH WIDOKACH)
+            // WIDOK POJAZDÓW - TUTAJ DODAŁEM NOWE POLA
             else if (viewName === 'vehicles') {
                 const sel = (val) => (record && record.fuel_type === val) ? 'selected' : '';
                 formHtml = `
+                    <label for="v_marka">Marka:</label>
+                    <input type="text" id="v_marka" value="${record ? (record.marka || '') : ''}" placeholder="np. Toyota">
+
+                    <label for="v_model">Model:</label>
+                    <input type="text" id="v_model" value="${record ? (record.model || '') : ''}" placeholder="np. Corolla">
+
                     <label for="reg_num">Nr Rejestracyjny:</label>
                     <input type="text" id="reg_num" value="${record ? record.registration_number : ''}" required>
 
                     <label for="vin_num">VIN:</label>
                     <input type="text" id="vin_num" value="${record ? record.vin : ''}" required>
+
+                    <label for="v_first_reg">Data pierwszej rejestracji:</label>
+                    <input type="date" id="v_first_reg" value="${record ? (record.data_pierwszej_rejestracji || '') : ''}">
 
                     <label for="fuel_type_input">Rodzaj Paliwa:</label>
                     <select id="fuel_type_input" required>
@@ -555,6 +565,9 @@
 
                     <label for="company_id">ID Firmy (wymagane):</label>
                     <input type="number" id="company_id" value="${record ? record.company : ''}" required>
+
+                    <label for="v_assigned_user">ID Przypisanego Użytkownika (opcjonalnie):</label>
+                    <input type="number" id="v_assigned_user" value="${record ? (record.assigned_user || '') : ''}">
                 `;
             }
             else if (viewName === 'damages') {
@@ -583,9 +596,7 @@
                     <input type="date" id="data_badan_val" value="${record ? record.data_waznosci_badan : ''}">
                 `;
             }
-            // Logika edycji zdarzenia serwisowego lub polisy - uproszczona (można rozbudować, ale na razie używamy starych formularzy, jeśli to edycja)
             else if (isCalendarEventView && currentRecordId) {
-                 // Używamy starej logiki edycji
                  const endpointForType = endpointMap[viewName];
                  if (endpointForType === 'service_events') {
                       const typeMap = {
@@ -595,19 +606,16 @@
                         'tech_inspections': 'BADANIE_TECH',
                         'legalization': 'LEGALIZACJA'
                       };
-                      const currentType = typeMap[viewName] || record.typ_zdarzenia; // Używamy typu z rekordu, jeśli to edycja
+                      const currentType = typeMap[viewName] || record.typ_zdarzenia;
 
                       formHtml = `
                         <input type="hidden" id="typ_zdarzenia_val" value="${currentType}">
                         <label for="pojazd_id">ID Pojazdu:</label>
                         <input type="number" id="pojazd_id" value="${record ? record.pojazd : ''}" required>
-
                         <label for="opis_serwisu">Opis:</label>
                         <textarea id="opis_serwisu" required>${record ? record.opis : ''}</textarea>
-
                         <label for="koszt_val">Koszt (PLN):</label>
                         <input type="number" id="koszt_val" step="0.01" value="${record ? record.koszt : ''}" required>
-
                         <label for="data_serwisu_val">Data Zdarzenia:</label>
                         <input type="date" id="data_serwisu_val" value="${record ? record.data_serwisu : ''}" required>
                     `;
@@ -632,125 +640,107 @@
 
         /** Obsługuje logikę zapisu (POST - dodawanie / PUT - edycja) */
         async function handleSave() {
+            const modalError = document.getElementById('modal-error');
             modalError.textContent = '';
 
-            // 1. Sprawdzamy, czy to jest formularz uniwersalny dodawania (z Terminarza)
             const eventTypeSelector = document.getElementById('event_type_selector');
             let data = {};
             let endpoint = endpointMap[currentView] || currentView;
             let method = currentRecordId ? 'PUT' : 'POST';
             let url = currentRecordId ? `${API_BASE}${endpoint}/${currentRecordId}/` : `${API_BASE}${endpoint}/`;
 
-            if (eventTypeSelector && !currentRecordId) {
-                // LOGIKA ZAPISU DLA NOWEGO TERMINU Z KALENDARZA
-                const selectedType = eventTypeSelector.value;
-                const pojazdId = document.getElementById('pojazd_id_selector').value;
-                const dataTerminu = document.getElementById('data_terminu').value;
-
-                if (!selectedType || !pojazdId || !dataTerminu) {
-                    modalError.textContent = "Proszę wypełnić wszystkie wymagane pola (Typ, Pojazd, Data).";
-                    return;
-                }
-
-                if (selectedType === 'POLICY_OC') {
-                     // Zapis Polisy
-                     const numerPolisy = document.getElementById('numer_polisy_val').value;
-                     const dataWaznosciAC = document.getElementById('data_waznosci_ac_val').value;
-
-                     data = {
-                        pojazd: pojazdId,
-                        numer_polisy: numerPolisy,
-                        data_waznosci_oc: dataTerminu,
-                        data_waznosci_ac: dataWaznosciAC || null
-                     };
-                     endpoint = 'policies';
-                } else {
-                     // Zapis ServiceEvent
-                     const opis = document.getElementById('opis_zdarzenia_val').value;
-                     const koszt = document.getElementById('koszt_val').value || 0;
-
-                     data = {
-                        pojazd: pojazdId,
-                        opis: opis,
-                        koszt: koszt,
-                        data_serwisu: dataTerminu,
-                        typ_zdarzenia: selectedType
-                     };
-                     endpoint = 'service_events';
-                }
-
-                method = 'POST';
-                url = `${API_BASE}${endpoint}/`;
-            }
-            // 2. Logika dla istniejących formularzy (edytowanie lub dodawanie w innych widokach)
-            else if (currentView === 'vehicles') {
-                data = {
-                    registration_number: document.getElementById('reg_num').value,
-                    vin: document.getElementById('vin_num').value,
-                    fuel_type: document.getElementById('fuel_type_input').value, // NOWE
-                    przebieg: document.getElementById('przebieg_val').value,
-                    company: document.getElementById('company_id').value,
-                    is_active: true
-                };
-            }
-            else if (currentView === 'damages') {
-                data = {
-                    pojazd: document.getElementById('pojazd_id').value,
-                    opis: document.getElementById('opis_szkody').value,
-                    data_zdarzenia: document.getElementById('data_zdarzenia_val').value,
-                    status_naprawy: document.getElementById('status_naprawy_val').value,
-                    szacowany_koszt: 0
-                };
-            }
-            else if (endpoint === 'service_events' && currentRecordId) { // Edycja ServiceEvent
-                 data = {
-                    pojazd: document.getElementById('pojazd_id').value,
-                    opis: document.getElementById('opis_serwisu').value,
-                    koszt: document.getElementById('koszt_val').value,
-                    data_serwisu: document.getElementById('data_serwisu_val').value,
-                    typ_zdarzenia: document.getElementById('typ_zdarzenia_val').value
-                 };
-            }
-            else if (currentView === 'policies' && currentRecordId) { // Edycja Polisy
-                 data = {
-                    pojazd: document.getElementById('pojazd_id').value,
-                    numer_polisy: document.getElementById('numer_polisy').value,
-                    data_waznosci_oc: document.getElementById('data_waznosci_oc').value,
-                    data_waznosci_ac: document.getElementById('data_waznosci_ac').value || null
-                 };
-            }
-
-
-            // 3. Wykonanie zapisu
             try {
+                if (eventTypeSelector && !currentRecordId) {
+                    // LOGIKA DLA NOWEGO TERMINU
+                    const selectedType = eventTypeSelector.value;
+                    const pojazdId = document.getElementById('pojazd_id_selector').value;
+                    const dataTerminu = document.getElementById('data_terminu').value;
+
+                    if (selectedType === 'POLICY_OC') {
+                        data = {
+                            pojazd: pojazdId,
+                            numer_polisy: document.getElementById('numer_polisy_val').value,
+                            data_waznosci_oc: dataTerminu,
+                            data_waznosci_ac: document.getElementById('data_waznosci_ac_val').value || null
+                        };
+                        endpoint = 'policies';
+                    } else {
+                        data = {
+                            pojazd: pojazdId,
+                            opis: document.getElementById('opis_zdarzenia_val').value,
+                            koszt: document.getElementById('koszt_val').value || 0,
+                            data_serwisu: dataTerminu,
+                            typ_zdarzenia: selectedType
+                        };
+                        endpoint = 'service_events';
+                    }
+                    url = `${API_BASE}${endpoint}/`;
+                }
+                else if (currentView === 'vehicles') {
+                    // BEZPIECZNE POBIERANIE DANYCH POJAZDU
+                    const rawDate = document.getElementById('v_first_reg').value;
+                    const rawUser = document.getElementById('v_assigned_user').value;
+
+                    data = {
+                        registration_number: document.getElementById('reg_num').value,
+                        vin: document.getElementById('vin_num').value,
+                        fuel_type: document.getElementById('fuel_type_input').value,
+                        przebieg: document.getElementById('przebieg_val').value,
+                        company: document.getElementById('company_id').value,
+                        is_active: true,
+                        marka: document.getElementById('v_marka').value,
+                        model: document.getElementById('v_model').value,
+                        data_pierwszej_rejestracji: rawDate ? rawDate : null,
+                        assigned_user: rawUser ? rawUser : null
+                    };
+                }
+                else if (currentView === 'damages') {
+                    data = {
+                        pojazd: document.getElementById('pojazd_id').value,
+                        opis: document.getElementById('opis_szkody').value,
+                        data_zdarzenia: document.getElementById('data_zdarzenia_val').value,
+                        status_naprawy: document.getElementById('status_naprawy_val').value,
+                        szacowany_koszt: 0
+                    };
+                }
+                else if (currentView === 'drivers') {
+                    data = {
+                        numer_prawa_jazdy: document.getElementById('prawa_jazdy_num').value,
+                        kategorie_prawa_jazdy: document.getElementById('kat_prawa_jazdy').value,
+                        data_waznosci_badan: document.getElementById('data_badan_val').value || null
+                    };
+                }
+                else if (endpoint === 'service_events' && currentRecordId) {
+                    data = {
+                        pojazd: document.getElementById('pojazd_id').value,
+                        opis: document.getElementById('opis_serwisu').value,
+                        koszt: document.getElementById('koszt_val').value,
+                        data_serwisu: document.getElementById('data_serwisu_val').value,
+                        typ_zdarzenia: document.getElementById('typ_zdarzenia_val').value
+                    };
+                }
+
+                // WYKONANIE ZAPISU
                 const response = await fetch(url, {
                     method: method,
                     headers: getAuthHeaders(),
                     body: JSON.stringify(data)
                 });
 
-                if (response.status === 401) { handleLogout(); throw new Error('Sesja wygasła.'); }
+                if (response.status === 401) { handleLogout(); return; }
 
                 if (response.ok) {
-                    modal.style.display = "none";
-
-                    // Po dodaniu terminu, przeładowujemy widok kalendarza, aby zobaczyć ramkę.
-                    if (eventTypeSelector && !currentRecordId) {
-                        loadView('calendar');
-                    } else {
-                        loadView(currentView);
-                    }
+                    document.getElementById('data-modal').style.display = "none";
+                    loadView(currentView === 'calendar' ? 'calendar' : currentView);
                 } else {
                     const errorData = await response.json();
-                    modalError.textContent = `Błąd ${response.status}: ${JSON.stringify(errorData)}`;
+                    modalError.textContent = `Błąd: ${JSON.stringify(errorData)}`;
                 }
-
             } catch (error) {
-                modalError.textContent = `Błąd sieci: ${error.message}`;
+                console.error("Błąd w handleSave:", error);
+                modalError.textContent = "Wypełnij poprawnie wszystkie pola.";
             }
         }
-
-        saveBtn.onclick = handleSave;
 
 
         /** Obsługuje logikę usuwania (DELETE) - bez zmian */
@@ -797,47 +787,75 @@
 
         // Zmodyfikowana funkcja, aby upewnić się, że inne widoki działają
         async function renderVehicles() {
-             currentView = 'vehicles';
-             viewTitle.textContent = 'Pojazdy';
-             mainContent.innerHTML = `<div class="table-header" style="grid-template-columns: 50px 1fr 1fr 1fr 1fr 1fr 1fr 120px;">
-                <div>Lp.</div>
-                <div>Nr Rej.</div>
-                <div>VIN</div>
-                <div>Paliwo</div> <div>Przebieg</div>
-                <div>Firma</div>
-                <div>Status</div>
-                <div>Akcje</div>
-                </div><div id="data-list">Ładowanie pojazdów...</div>`;
-             const dataListDiv = document.getElementById('data-list');
-             try {
-                 const response = await fetch(API_BASE + 'vehicles/', { headers: getAuthHeaders() });
-                 if (response.status === 401) { handleLogout(); throw new Error('Sesja wygasła.'); }
-                 if (!response.ok) throw new Error(response.statusText);
-                 const vehicles = await response.json();
-                 dataListDiv.innerHTML = '';
-                 vehicles.forEach((vehicle, index) => {
-                     const statusColor = vehicle.is_active ? 'green' : '#ffc107';
-                     const statusText = vehicle.is_active ? 'Aktywny' : 'Serwis';
-                     const companyName = vehicle.company_name || 'Brak Firmy';
-                     const paliwo = vehicle.fuel_type_display || vehicle.fuel_type || '-';
-                     const row = document.createElement('div');
-                     row.className = 'table-row';
-                     row.style.gridTemplateColumns = "50px 1fr 1fr 1fr 1fr 1fr 1fr 120px";
-                     row.innerHTML = `
-                     <div>${index + 1}.</div>
-                     <div>${vehicle.registration_number}</div>
-                     <div>${vehicle.vin}</div>
-                     <div>${paliwo}</div> <div>${vehicle.przebieg ? vehicle.przebieg.toLocaleString() : 'N/A'} km</div>
-                     <div>${companyName}</div>
-                     <div style="color: ${statusColor}; font-weight: bold;">${statusText}</div>
-                     <div>${getActionButtons(vehicle, 'vehicles')}</div>
-                 `;
-                 dataListDiv.appendChild(row);
-             });
-             } catch (error) {
-                 dataListDiv.innerHTML = `<div class="error">Błąd: ${error.message}. Brak danych lub brak autoryzacji.</div>`;
-             }
-         }
+            currentView = 'vehicles';
+            viewTitle.textContent = 'Pojazdy';
+
+            // Rozbudowany nagłówek - 11 kolumn
+            // Lp(40px), Marka(1fr), Model(1fr), NrRej(110px), VIN(1.2fr), Paliwo(100px), Przebieg(100px), Firma(1fr), Użytkownik(1fr), Data(120px), Akcje(100px)
+            const gridLayout = "40px 1fr 1fr 110px 1.2fr 100px 100px 1fr 1fr 120px 100px";
+
+            mainContent.innerHTML = `
+                <div class="table-header" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; align-items: center;">
+                    <div>Lp.</div>
+                    <div>Marka</div>
+                    <div>Model</div>
+                    <div>Nr Rej.</div>
+                    <div>VIN</div>
+                    <div>Paliwo</div>
+                    <div>Przebieg</div>
+                    <div>Firma</div>
+                    <div>Użytkownik</div>
+                    <div>Data pierwszej rejestracji</div>
+                    <div>Akcje</div>
+                </div>
+                <div id="data-list">Ładowanie pojazdów...</div>`;
+
+            const dataListDiv = document.getElementById('data-list');
+
+            try {
+                const response = await fetch(API_BASE + 'vehicles/', { headers: getAuthHeaders() });
+
+                if (response.status === 401) {
+                    handleLogout();
+                    throw new Error('Sesja wygasła.');
+                }
+                if (!response.ok) throw new Error(response.statusText);
+
+                const vehicles = await response.json();
+                dataListDiv.innerHTML = '';
+
+                vehicles.forEach((vehicle, index) => {
+                    const statusColor = vehicle.is_active ? 'green' : '#ffc107';
+                    const statusText = vehicle.is_active ? 'Aktywny' : 'Serwis';
+                    const companyName = vehicle.company_name || 'Brak Firmy';
+                    const paliwo = vehicle.fuel_type_display || vehicle.fuel_type || '-';
+
+                    const row = document.createElement('div');
+                    row.className = 'table-row';
+                    row.style.display = 'grid';
+                    row.style.gridTemplateColumns = gridLayout;
+                    row.style.gap = '10px';
+                    row.style.alignItems = 'center';
+
+                    row.innerHTML = `
+                        <div>${index + 1}.</div>
+                        <div style="font-weight: bold;">${vehicle.marka || '---'}</div>
+                        <div>${vehicle.model || '---'}</div>
+                        <div><span class="badge" style="border: 1px solid #ccc; padding: 2px 5px; border-radius: 4px; background: #f9f9f9;">${vehicle.registration_number}</span></div>
+                        <div style="font-size: 0.85em; color: #555;">${vehicle.vin}</div>
+                        <div>${paliwo}</div>
+                        <div>${vehicle.przebieg ? vehicle.przebieg.toLocaleString() : 'N/A'} km</div>
+                        <div>${companyName}</div>
+                        <div>${vehicle.assigned_user_name || '<span style="color: #999;">Brak</span>'}</div>
+                        <div style="font-size: 0.9em;">${vehicle.data_pierwszej_rejestracji || '---'}</div>
+                        <div>${getActionButtons(vehicle, 'vehicles')}</div>
+                    `;
+                    dataListDiv.appendChild(row);
+                });
+            } catch (error) {
+                dataListDiv.innerHTML = `<div class="error">Błąd: ${error.message}. Brak danych lub brak autoryzacji.</div>`;
+            }
+        }
 
          // Funkcja renderująca zdarzenia serwisowe (potrzebna dla podmenu)
          async function renderServiceEvents(filterType = null) {
@@ -1079,6 +1097,18 @@
             return events;
         }
 
+        function filterTable() {
+            const input = document.getElementById('table-search');
+            if (!input) return; // Jeśli nie ma pola wyszukiwania, nic nie rób
+
+            const filter = input.value.toLowerCase();
+            const rows = document.querySelectorAll('.table-row');
+
+            rows.forEach(row => {
+                const text = row.textContent || row.innerText;
+                row.style.display = text.toLowerCase().includes(filter) ? "grid" : "none";
+            });
+        }
 
         /**
          * Główna funkcja renderująca Kalendarz
