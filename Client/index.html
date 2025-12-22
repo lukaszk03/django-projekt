@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
-    <title>NAVIFLEET - Pełny Interfejs Floty</title>
+    <title>FLEETIO - Pełny Interfejs Floty</title>
     <style>
         /* CSS dla całego układu */
         body {
@@ -196,7 +196,7 @@
 
         <div class="login-container" id="login-container">
             <div class="login-box" id="login-box">
-                <h2>Logowanie do NAVIFLEET</h2>
+                <h2>Logowanie do FLEETIO</h2>
                 <p style="color: red; height: 1.5em;" id="login-error"></p>
                 <form id="login-form">
                     <input type="text" id="username" placeholder="Nazwa użytkownika" required>
@@ -229,9 +229,10 @@
                     Masz już konto? <a href="#" onclick="showLogin()">Wróć do logowania</a>
                 </p>
             </div>
-        </div> <div class="main-app" id="main-app" style="display: none;">
+        </div>
+        <div class="main-app" id="main-app" style="display: none;">
             <div class="sidebar">
-                <div style="padding: 10px 20px; font-size: 1.5em; color: #007bff; font-weight: 900;">NAVIFLEET</div>
+                <div style="padding: 10px 20px; font-size: 1.5em; color: #007bff; font-weight: 900;">FLEETIO</div>
 
                 <div class="menu-item active" data-view="vehicles"><span>🚗 Pojazdy</span></div>
                 <div class="menu-item" data-view="drivers"><i class="fas fa-users"></i> Użytkownicy</div>
@@ -270,6 +271,7 @@
                         <button class="btn-add" id="add-btn">➕ DODAJ</button>
                     </div>
                 </div>
+                <div id="main-content"></div>
             </div>
         </div>
 
@@ -310,6 +312,7 @@
         const modalForm = document.getElementById('modal-form');
         const modalError = document.getElementById('modal-error');
         const saveBtn = document.getElementById('save-btn');
+        saveBtn.onclick = handleSave;
         const deleteBtn = document.getElementById('delete-btn');
         const addBtn = document.getElementById('add-btn');
 
@@ -639,26 +642,33 @@
 
 
         /** Obsługuje logikę zapisu (POST - dodawanie / PUT - edycja) */
-        async function handleSave() {
+        async function handleSave(event) {
+            // 1. Zatrzymujemy domyślną akcję (zapobiega to zmianie na GET i odświeżeniu strony)
+            if (event && event.preventDefault) event.preventDefault();
+
             const modalError = document.getElementById('modal-error');
             modalError.textContent = '';
 
             const eventTypeSelector = document.getElementById('event_type_selector');
             let data = {};
             let endpoint = endpointMap[currentView] || currentView;
+
+            // Ustalamy metodę i URL
             let method = currentRecordId ? 'PUT' : 'POST';
             let url = currentRecordId ? `${API_BASE}${endpoint}/${currentRecordId}/` : `${API_BASE}${endpoint}/`;
 
+            console.log(`Próba zapisu: ${method} na ${url}`); // Debugowanie w konsoli
+
             try {
                 if (eventTypeSelector && !currentRecordId) {
-                    // LOGIKA DLA NOWEGO TERMINU
+                    // LOGIKA DLA NOWEGO TERMINU (Z KALENDARZA)
                     const selectedType = eventTypeSelector.value;
                     const pojazdId = document.getElementById('pojazd_id_selector').value;
                     const dataTerminu = document.getElementById('data_terminu').value;
 
                     if (selectedType === 'POLICY_OC') {
                         data = {
-                            pojazd: pojazdId,
+                            pojazd: parseInt(pojazdId),
                             numer_polisy: document.getElementById('numer_polisy_val').value,
                             data_waznosci_oc: dataTerminu,
                             data_waznosci_ac: document.getElementById('data_waznosci_ac_val').value || null
@@ -666,37 +676,40 @@
                         endpoint = 'policies';
                     } else {
                         data = {
-                            pojazd: pojazdId,
+                            pojazd: parseInt(pojazdId),
                             opis: document.getElementById('opis_zdarzenia_val').value,
-                            koszt: document.getElementById('koszt_val').value || 0,
+                            koszt: parseFloat(document.getElementById('koszt_val').value) || 0,
                             data_serwisu: dataTerminu,
                             typ_zdarzenia: selectedType
                         };
                         endpoint = 'service_events';
                     }
                     url = `${API_BASE}${endpoint}/`;
+                    method = 'POST'; // Dla kalendarza zawsze POST przy nowym
                 }
                 else if (currentView === 'vehicles') {
-                    // BEZPIECZNE POBIERANIE DANYCH POJAZDU
+                    // POJAZDY - KONWERSJA NA LICZBY DLA DJANGO
                     const rawDate = document.getElementById('v_first_reg').value;
                     const rawUser = document.getElementById('v_assigned_user').value;
+                    const rawCompany = document.getElementById('company_id').value;
+                    const rawMileage = document.getElementById('przebieg_val').value;
 
                     data = {
                         registration_number: document.getElementById('reg_num').value,
                         vin: document.getElementById('vin_num').value,
                         fuel_type: document.getElementById('fuel_type_input').value,
-                        przebieg: document.getElementById('przebieg_val').value,
-                        company: document.getElementById('company_id').value,
+                        przebieg: parseFloat(rawMileage) || 0,
+                        company: parseInt(rawCompany) || null,
                         is_active: true,
                         marka: document.getElementById('v_marka').value,
                         model: document.getElementById('v_model').value,
-                        data_pierwszej_rejestracji: rawDate ? rawDate : null,
-                        assigned_user: rawUser ? rawUser : null
+                        data_pierwszej_rejestracji: rawDate || null,
+                        assigned_user: rawUser ? parseInt(rawUser) : null
                     };
                 }
                 else if (currentView === 'damages') {
                     data = {
-                        pojazd: document.getElementById('pojazd_id').value,
+                        pojazd: parseInt(document.getElementById('pojazd_id').value),
                         opis: document.getElementById('opis_szkody').value,
                         data_zdarzenia: document.getElementById('data_zdarzenia_val').value,
                         status_naprawy: document.getElementById('status_naprawy_val').value,
@@ -712,33 +725,39 @@
                 }
                 else if (endpoint === 'service_events' && currentRecordId) {
                     data = {
-                        pojazd: document.getElementById('pojazd_id').value,
+                        pojazd: parseInt(document.getElementById('pojazd_id').value),
                         opis: document.getElementById('opis_serwisu').value,
-                        koszt: document.getElementById('koszt_val').value,
+                        koszt: parseFloat(document.getElementById('koszt_val').value) || 0,
                         data_serwisu: document.getElementById('data_serwisu_val').value,
                         typ_zdarzenia: document.getElementById('typ_zdarzenia_val').value
                     };
                 }
 
-                // WYKONANIE ZAPISU
+                // WYKONANIE ZAPISU Z NAGŁÓWKIEM CONTENT-TYPE
                 const response = await fetch(url, {
                     method: method,
-                    headers: getAuthHeaders(),
+                    headers: {
+                        ...getAuthHeaders(),
+                        'Content-Type': 'application/json' // Konieczne, by Django widziało JSON
+                    },
                     body: JSON.stringify(data)
                 });
 
                 if (response.status === 401) { handleLogout(); return; }
 
                 if (response.ok) {
+                    console.log("Sukces!");
                     document.getElementById('data-modal').style.display = "none";
-                    loadView(currentView === 'calendar' ? 'calendar' : currentView);
+                    // Przeładuj widok
+                    loadView(currentView);
                 } else {
                     const errorData = await response.json();
+                    console.error("Błąd z serwera:", errorData);
                     modalError.textContent = `Błąd: ${JSON.stringify(errorData)}`;
                 }
             } catch (error) {
-                console.error("Błąd w handleSave:", error);
-                modalError.textContent = "Wypełnij poprawnie wszystkie pola.";
+                console.error("Błąd sieciowy:", error);
+                modalError.textContent = "Wystąpił błąd podczas zapisywania danych.";
             }
         }
 

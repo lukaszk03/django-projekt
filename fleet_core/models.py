@@ -65,8 +65,8 @@ class Vehicle(models.Model):
     przebieg = models.FloatField(default=0.0)
 
     # Relacja do Firmy
-    company = models.ForeignKey(FleetCompany, on_delete=models.CASCADE, related_name='vehicles')
-
+    # company = models.ForeignKey(FleetCompany, on_delete=models.CASCADE, related_name='vehicles')
+    company = models.ForeignKey(FleetCompany, on_delete=models.SET_NULL, null=True, blank=True) #wersja tymczasowa
     def __str__(self):
         return f"{self.registration_number} ({self.vin})"
 
