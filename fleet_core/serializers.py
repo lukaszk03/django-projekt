@@ -23,6 +23,8 @@ class VehicleDto(serializers.ModelSerializer):
 
 # 2. SERIALIZER DLA UŻYTKOWNIKÓW (Kierowców)
 class DriverDto(serializers.ModelSerializer):
+    first_name = serializers.ReadOnlyField(source='user.first_name', default='')
+    last_name = serializers.ReadOnlyField(source='user.last_name', default='')
     # Weryfikacja: Czy user_name poprawnie mapuje się do pola 'username' w CustomUser?
     user_name = serializers.ReadOnlyField(source='user.username', default='Brak loginu')
     email = serializers.ReadOnlyField(source='user.email', default='Brak email')
@@ -31,9 +33,9 @@ class DriverDto(serializers.ModelSerializer):
     class Meta:
         model = Driver
         fields = [
-            'id', 'user', 'user_name', 'email', 'numer_prawa_jazdy',
-            'kategorie_prawa_jazdy', 'data_waznosci_badan',
-            'company', 'company_name'
+            'id', 'user', 'user_name', 'first_name', 'last_name', 'email',
+            'numer_prawa_jazdy', 'kategorie_prawa_jazdy',
+            'data_waznosci_badan', 'company', 'company_name'
         ]
 
 # 3. SERIALIZER DLA ZDARZEŃ SERWISOWYCH (ServiceEventDto)

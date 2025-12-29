@@ -491,20 +491,47 @@
 
 
         /** Otwiera modal i ładuje odpowiedni formularz */
-        async function openModal(viewName, record = null) {
-            currentRecordId = record ? record.id : null;
-            modalTitle.textContent = currentRecordId ? `Edytuj rekord (${viewName})` : `Dodaj nowy rekord (${viewName})`;
+        async function openModal(viewName, recordOrId = null) {
+            let record = null;
             modalError.textContent = '';
-            modalForm.innerHTML = '';
+            modalForm.innerHTML = 'Ładowanie danych...'; // Informacja dla użytkownika
+
+            // --- LOGIKA POBIERANIA DANYCH JEŚLI PRZEKAZANO TYLKO ID ---
+            if (recordOrId !== null) {
+                if (typeof recordOrId === 'object') {
+                    record = recordOrId;
+                    currentRecordId = record.id;
+                } else {
+                    // Przekazano samo ID (np. z przycisku w tabeli)
+                    currentRecordId = recordOrId;
+                    try {
+                        const endpoint = endpointMap[viewName] || viewName;
+                        const response = await fetch(`${API_BASE}${endpoint}/${currentRecordId}/`, {
+                            headers: getAuthHeaders()
+                        });
+                        if (response.ok) {
+                            record = await response.json();
+                        } else {
+                            throw new Error("Nie udało się pobrać danych rekordu.");
+                        }
+                    } catch (error) {
+                        modalError.textContent = "Błąd ładowania: " + error.message;
+                        return;
+                    }
+                }
+            } else {
+                currentRecordId = null;
+            }
+
+            modalTitle.textContent = currentRecordId ? `Edytuj rekord (${viewName})` : `Dodaj nowy rekord (${viewName})`;
             deleteBtn.style.display = currentRecordId ? 'inline' : 'none';
 
             let formHtml = '';
             const isCalendarEventView = ['calendar', 'policies', 'tech_inspections', 'reviews', 'repairs', 'legalization', 'inspection'].includes(viewName);
 
-            // LOGIKA DLA UNIWERSALNEGO FORMULARZA TERMINARZA (NOWY TERMIN)
+            // 1. WIDOK DLA NOWEGO TERMINU (KALENDARZ)
             if (isCalendarEventView && !currentRecordId) {
                 modalTitle.textContent = `Dodaj Nowy Termin/Zdarzenie`;
-
                 const vehicles = await fetchVehicles();
                 const vehicleOptions = vehicles.map(v => `<option value="${v.id}">${v.registration_number} (ID: ${v.id})</option>`).join('');
 
@@ -519,145 +546,100 @@
                         <option value="LEGALIZACJA">Legalizacja</option>
                         <option value="POLICY_OC">Polisa OC/AC</option>
                     </select>
-
                     <label for="pojazd_id_selector">Pojazd:</label>
-                    <select id="pojazd_id_selector" required>
-                        <option value="" disabled selected>-- Wybierz pojazd --</option>
-                        ${vehicleOptions}
-                    </select>
-
+                    <select id="pojazd_id_selector" required>${vehicleOptions}</select>
                     <div id="dynamic-fields-container"></div>
-
-                    <label for="data_terminu">Data Terminu (Ważności/Serwisu):</label>
+                    <label for="data_terminu">Data Terminu:</label>
                     <input type="date" id="data_terminu" required>
                 `;
             }
-            // WIDOK POJAZDÓW - TUTAJ DODAŁEM NOWE POLA
+            // 2. POJAZDY
             else if (viewName === 'vehicles') {
-                const sel = (val) => (record && record.fuel_type === val) ? 'selected' : '';
-                const selStatus = (val) => (record && record.status === val) ? 'selected' : '';
-                const selType = (val) => (record && record.typ_pojazdu === val) ? 'selected' : '';
+                const sel = (f, v) => (record && record[f] === v) ? 'selected' : '';
                 formHtml = `
                     <label for="v_marka">Marka:</label>
-                    <input type="text" id="v_marka" value="${record ? (record.marka || '') : ''}" placeholder="np. Toyota">
-
+                    <input type="text" id="v_marka" value="${record?.marka || ''}" placeholder="np. Toyota">
                     <label for="v_model">Model:</label>
-                    <input type="text" id="v_model" value="${record ? (record.model || '') : ''}" placeholder="np. Corolla">
-
+                    <input type="text" id="v_model" value="${record?.model || ''}" placeholder="np. Corolla">
                     <label for="v_type">Typ pojazdu:</label>
                     <select id="v_type">
-                        <option value="OSOBOWE" ${selType('OSOBOWE')}>Osobowe</option>
-                        <option value="CIEZAROWE" ${selType('CIEZAROWE')}>Ciężarowe</option>
-                        <option value="AUTOBUSY" ${selType('AUTOBUSY')}>Autobusy</option>
-                        <option value="MOTOCYKLE" ${selType('MOTOCYKLE')}>Motocykle</option>
-                        <option value="SEDAN" ${selType('SEDAN')}>Sedan</option>
-                        <option value="SUV" ${selType('SUV')}>SUV</option>
-                        <option value="HATCHBACK" ${selType('HATCHBACK')}>Hatchback</option>
-                        <option value="KOMBI" ${selType('KOMBI')}>Kombi</option>
-                        <option value="COUPE" ${selType('COUPE')}>Coupé</option>
+                        <option value="OSOBOWE" ${sel('typ_pojazdu', 'OSOBOWE')}>Osobowe</option>
+                        <option value="CIEZAROWE" ${sel('typ_pojazdu', 'CIEZAROWE')}>Ciężarowe</option>
+                        <option value="AUTOBUSY" ${sel('typ_pojazdu', 'AUTOBUSY')}>Autobusy</option>
+                        <option value="SEDAN" ${sel('typ_pojazdu', 'SEDAN')}>Sedan</option>
+                        <option value="SUV" ${sel('typ_pojazdu', 'SUV')}>SUV</option>
+                        <option value="KOMBI" ${sel('typ_pojazdu', 'KOMBI')}>Kombi</option>
                     </select>
-
                     <label for="reg_num">Nr Rejestracyjny:</label>
-                    <input type="text" id="reg_num" value="${record ? record.registration_number : ''}" required>
-
+                    <input type="text" id="reg_num" value="${record?.registration_number || ''}" required>
                     <label for="vin_num">VIN:</label>
-                    <input type="text" id="vin_num" value="${record ? record.vin : ''}" required>
-
+                    <input type="text" id="vin_num" value="${record?.vin || ''}" required>
                     <label for="v_first_reg">Data pierwszej rejestracji:</label>
-                    <input type="date" id="v_first_reg" value="${record ? (record.data_pierwszej_rejestracji || '') : ''}">
-
+                    <input type="date" id="v_first_reg" value="${record?.data_pierwszej_rejestracji || ''}">
                     <label for="fuel_type_input">Rodzaj Paliwa:</label>
                     <select id="fuel_type_input" required>
-                        <option value="BENZYNA" ${sel('BENZYNA')}>Benzyna</option>
-                        <option value="DIESEL" ${sel('DIESEL')}>Diesel</option>
-                        <option value="ELECTRIC" ${sel('ELECTRIC')}>Elektryczny</option>
-                        <option value="HYBRID" ${sel('HYBRID')}>Hybryda</option>
-                        <option value="PHEV" ${sel('PHEV')}>Hybryda Plug-in</option>
-                        <option value="LPG" ${sel('LPG')}>LPG</option>
-                        <option value="CNG" ${sel('CNG')}>CNG</option>
-                        <option value="HYDROGEN" ${sel('HYDROGEN')}>Wodorowy</option>
+                        <option value="BENZYNA" ${sel('fuel_type', 'BENZYNA')}>Benzyna</option>
+                        <option value="DIESEL" ${sel('fuel_type', 'DIESEL')}>Diesel</option>
+                        <option value="ELECTRIC" ${sel('fuel_type', 'ELECTRIC')}>Elektryczny</option>
+                        <option value="LPG" ${sel('fuel_type', 'LPG')}>LPG</option>
                     </select>
-
                     <label for="przebieg_val">Przebieg (km):</label>
-                    <input type="number" id="przebieg_val" value="${record ? record.przebieg : ''}" required>
-
-                    <label for="company_id">ID Firmy (wymagane):</label>
-                    <input type="number" id="company_id" value="${record ? record.company : ''}" required>
-
-                    <label for="v_assigned_user">ID Przypisanego Użytkownika (opcjonalnie):</label>
-                    <input type="number" id="v_assigned_user" value="${record ? (record.assigned_user || '') : ''}">
-
+                    <input type="number" id="przebieg_val" value="${record?.przebieg || ''}" required>
+                    <label for="company_id">ID Firmy:</label>
+                    <input type="number" id="company_id" value="${record?.company || ''}" required>
+                    <label for="v_assigned_user">ID Przypisanego Użytkownika:</label>
+                    <input type="number" id="v_assigned_user" value="${record?.assigned_user || ''}">
                     <label for="v_status">Status pojazdu:</label>
                     <select id="v_status">
-                        <option value="SPRAWNY" ${selStatus('SPRAWNY')}>Sprawny</option>
-                        <option value="NIESPRAWNY" ${selStatus('NIESPRAWNY')}>Niesprawny</option>
+                        <option value="SPRAWNY" ${sel('status', 'SPRAWNY')}>Sprawny</option>
+                        <option value="NIESPRAWNY" ${sel('status', 'NIESPRAWNY')}>Niesprawny</option>
                     </select>
-
                     <label for="v_uwagi">Uwagi:</label>
-                    <textarea id="v_uwagi" rows="3" placeholder="Dodatkowe informacje...">${record ? (record.uwagi || '') : ''}</textarea>
+                    <textarea id="v_uwagi" rows="2">${record?.uwagi || ''}</textarea>
                 `;
             }
-            else if (viewName === 'damages') {
-                formHtml = `
-                    <label for="pojazd_id">ID Pojazdu:</label>
-                    <input type="number" id="pojazd_id" value="${record ? record.pojazd : ''}" required>
-                    <label for="opis_szkody">Opis:</label>
-                    <textarea id="opis_szkody" required>${record ? record.opis : ''}</textarea>
-                    <label for="data_zdarzenia_val">Data Zdarzenia:</label>
-                    <input type="date" id="data_zdarzenia_val" value="${record ? record.data_zdarzenia : ''}" required>
-                    <label for="status_naprawy_val">Status:</label>
-                    <select id="status_naprawy_val">
-                        <option value="ZGLOSZONA" ${record && record.status_naprawy === 'ZGLOSZONA' ? 'selected' : ''}>Zgłoszona</option>
-                        <option value="W_NAPRAWIE" ${record && record.status_naprawy === 'W_NAPRAWIE' ? 'selected' : ''}>W naprawie</option>
-                        <option value="ZAMKNIETA" ${record && record.status_naprawy === 'ZAMKNIETA' ? 'selected' : ''}>Zamknięta</option>
-                    </select>
-                `;
-            }
+            // 3. KIEROWCY (Z Twoimi polami)
             else if (viewName === 'drivers') {
                 formHtml = `
-                    <label for="d_company">ID Firmy:</label>
-                    <input type="number" id="d_company_id" value="${record ? record.company : ''}" placeholder="Wpisz ID firmy">
-                    <label>Numer Prawa Jazdy:</label>
-                    <input type="text" id="prawa_jazdy_num" value="${record ? record.numer_prawa_jazdy : ''}">
-                    <label>Kategorie:</label>
-                    <input type="text" id="kat_prawa_jazdy" value="${record ? record.kategorie_prawa_jazdy : 'B'}">
-                    <label>Ważność badań lekarskich:</label>
-                    <input type="date" id="data_badan_val" value="${record ? record.data_waznosci_badan : ''}">
+                    <label for="d_user_id">ID Użytkownika Systemowego:</label>
+                    <input type="number" id="d_user_id" value="${record?.user || ''}" ${currentRecordId ? 'disabled' : ''} required>
+                    <label for="d_company_id">ID Firmy:</label>
+                    <input type="number" id="d_company_id" value="${record?.company || ''}">
+                    <label for="prawa_jazdy_num">Numer Prawa Jazdy:</label>
+                    <input type="text" id="prawa_jazdy_num" value="${record?.numer_prawa_jazdy || ''}">
+                    <label for="kat_prawa_jazdy">Kategorie:</label>
+                    <input type="text" id="kat_prawa_jazdy" value="${record?.kategorie_prawa_jazdy || 'B'}">
+                    <label for="data_waznosci_pj_val">Ważność Prawa Jazdy:</label>
+                    <input type="date" id="data_waznosci_pj_val" value="${record?.data_waznosci_prawa_jazdy || ''}" required>
+                    <label for="data_badan_val">Ważność badań lekarskich:</label>
+                    <input type="date" id="data_badan_val" value="${record?.data_waznosci_badan || ''}">
                 `;
             }
+            // 4. EDYCJA ISTNIEJĄCYCH TERMINÓW
             else if (isCalendarEventView && currentRecordId) {
                  const endpointForType = endpointMap[viewName];
                  if (endpointForType === 'service_events') {
-                      const typeMap = {
-                        'inspection': 'INSPEKCJA',
-                        'repairs': 'NAPRAWA',
-                        'reviews': 'PRZEGLAD',
-                        'tech_inspections': 'BADANIE_TECH',
-                        'legalization': 'LEGALIZACJA'
-                      };
-                      const currentType = typeMap[viewName] || record.typ_zdarzenia;
-
                       formHtml = `
-                        <input type="hidden" id="typ_zdarzenia_val" value="${currentType}">
+                        <input type="hidden" id="typ_zdarzenia_val" value="${record.typ_zdarzenia}">
                         <label for="pojazd_id">ID Pojazdu:</label>
-                        <input type="number" id="pojazd_id" value="${record ? record.pojazd : ''}" required>
+                        <input type="number" id="pojazd_id" value="${record.pojazd}" required>
                         <label for="opis_serwisu">Opis:</label>
-                        <textarea id="opis_serwisu" required>${record ? record.opis : ''}</textarea>
+                        <textarea id="opis_serwisu" required>${record.opis}</textarea>
                         <label for="koszt_val">Koszt (PLN):</label>
-                        <input type="number" id="koszt_val" step="0.01" value="${record ? record.koszt : ''}" required>
+                        <input type="number" id="koszt_val" step="0.01" value="${record.koszt}" required>
                         <label for="data_serwisu_val">Data Zdarzenia:</label>
-                        <input type="date" id="data_serwisu_val" value="${record ? record.data_serwisu : ''}" required>
+                        <input type="date" id="data_serwisu_val" value="${record.data_serwisu}" required>
                     `;
                  } else if (endpointForType === 'policies') {
                       formHtml = `
                             <label for="pojazd_id">ID Pojazdu:</label>
-                            <input type="number" id="pojazd_id" value="${record ? record.pojazd : ''}" required>
+                            <input type="number" id="pojazd_id" value="${record.pojazd}" required>
                             <label for="numer_polisy">Numer Polisy:</label>
-                            <input type="text" id="numer_polisy" value="${record ? record.numer_polisy : ''}" required>
+                            <input type="text" id="numer_polisy" value="${record.numer_polisy}" required>
                             <label for="data_waznosci_oc">Data Ważności OC:</label>
-                            <input type="date" id="data_waznosci_oc" value="${record ? record.data_waznosci_oc : ''}" required>
-                            <label for="data_waznosci_ac">Data Ważności AC (opcjonalnie):</label>
-                            <input type="date" id="data_waznosci_ac" value="${record ? record.data_waznosci_ac : ''}">
+                            <input type="date" id="data_waznosci_oc" value="${record.data_waznosci_oc}" required>
+                            <label for="data_waznosci_ac">Data Ważności AC:</label>
+                            <input type="date" id="data_waznosci_ac" value="${record.data_waznosci_ac || ''}">
                         `;
                  }
             }
@@ -673,7 +655,7 @@
             if (event && event.preventDefault) event.preventDefault();
 
             const modalError = document.getElementById('modal-error');
-            modalError.textContent = '';
+            if (modalError) modalError.textContent = '';
 
             const eventTypeSelector = document.getElementById('event_type_selector');
             let data = {};
@@ -683,7 +665,7 @@
             let method = currentRecordId ? 'PUT' : 'POST';
             let url = currentRecordId ? `${API_BASE}${endpoint}/${currentRecordId}/` : `${API_BASE}${endpoint}/`;
 
-            console.log(`Próba zapisu: ${method} na ${url}`); // Debugowanie w konsoli
+            console.log(`Próba zapisu: ${method} na ${url}`);
 
             try {
                 if (eventTypeSelector && !currentRecordId) {
@@ -711,26 +693,20 @@
                         endpoint = 'service_events';
                     }
                     url = `${API_BASE}${endpoint}/`;
-                    method = 'POST'; // Dla kalendarza zawsze POST przy nowym
+                    method = 'POST';
                 }
                 else if (currentView === 'vehicles') {
-                    // POJAZDY - KONWERSJA NA LICZBY DLA DJANGO
-                    const rawDate = document.getElementById('v_first_reg').value;
-                    const rawUser = document.getElementById('v_assigned_user').value;
-                    const rawCompany = document.getElementById('company_id').value;
-                    const rawMileage = document.getElementById('przebieg_val').value;
-
                     data = {
                         registration_number: document.getElementById('reg_num').value,
                         vin: document.getElementById('vin_num').value,
                         fuel_type: document.getElementById('fuel_type_input').value,
-                        przebieg: parseFloat(rawMileage) || 0,
-                        company: parseInt(rawCompany) || null,
+                        przebieg: parseFloat(document.getElementById('przebieg_val').value) || 0,
+                        company: parseInt(document.getElementById('company_id').value) || null,
                         is_active: true,
                         marka: document.getElementById('v_marka').value,
                         model: document.getElementById('v_model').value,
-                        data_pierwszej_rejestracji: rawDate || null,
-                        assigned_user: rawUser ? parseInt(rawUser) : null,
+                        data_pierwszej_rejestracji: document.getElementById('v_first_reg').value || null,
+                        assigned_user: document.getElementById('v_assigned_user').value ? parseInt(document.getElementById('v_assigned_user').value) : null,
                         status: document.getElementById('v_status').value,
                         typ_pojazdu: document.getElementById('v_type').value,
                         uwagi: document.getElementById('v_uwagi').value || null
@@ -746,29 +722,54 @@
                     };
                 }
                 else if (currentView === 'drivers') {
+                    const userIdInput = document.getElementById('d_user_id');
+                    const userId = userIdInput ? userIdInput.value : null;
+
+                    if (!userId && !currentRecordId) {
+                        alert("ID użytkownika jest wymagane do utworzenia profilu kierowcy!");
+                        return;
+                    }
+
                     data = {
+                        // Przy PUT (edycji) pole user może być disabled, więc bierzemy wartość tylko jeśli istnieje
+                        ...(userId && { user: parseInt(userId) }),
                         numer_prawa_jazdy: document.getElementById('prawa_jazdy_num').value,
                         kategorie_prawa_jazdy: document.getElementById('kat_prawa_jazdy').value,
-                        company: parseInt(document.getElementById('d_company_id').value) || null, // Dodajemy ID firmy
+
+                        // --- KLUCZOWA POPRAWKA: Przesyłamy datę ważności PJ ---
+                        data_waznosci_prawa_jazdy: document.getElementById('data_waznosci_pj_val').value || null,
+
+                        company: parseInt(document.getElementById('d_company_id').value) || null,
                         data_waznosci_badan: document.getElementById('data_badan_val').value || null
                     };
                 }
-                else if (endpoint === 'service_events' && currentRecordId) {
-                    data = {
-                        pojazd: parseInt(document.getElementById('pojazd_id').value),
-                        opis: document.getElementById('opis_serwisu').value,
-                        koszt: parseFloat(document.getElementById('koszt_val').value) || 0,
-                        data_serwisu: document.getElementById('data_serwisu_val').value,
-                        typ_zdarzenia: document.getElementById('typ_zdarzenia_val').value
-                    };
+                else if (currentRecordId) {
+                    // EDYCJA ZDARZEŃ SERWISOWYCH I POLIS (Gdy viewName to np. 'repairs' lub 'policies')
+                    const resolvedEndpoint = endpointMap[currentView] || currentView;
+
+                    if (resolvedEndpoint === 'service_events') {
+                        data = {
+                            pojazd: parseInt(document.getElementById('pojazd_id').value),
+                            opis: document.getElementById('opis_serwisu').value,
+                            koszt: parseFloat(document.getElementById('koszt_val').value) || 0,
+                            data_serwisu: document.getElementById('data_serwisu_val').value,
+                            typ_zdarzenia: document.getElementById('typ_zdarzenia_val').value
+                        };
+                    } else if (resolvedEndpoint === 'policies') {
+                        data = {
+                            pojazd: parseInt(document.getElementById('pojazd_id').value),
+                            numer_polisy: document.getElementById('numer_polisy').value,
+                            data_waznosci_oc: document.getElementById('data_waznosci_oc').value,
+                            data_waznosci_ac: document.getElementById('data_waznosci_ac').value || null
+                        };
+                    }
                 }
 
-                // WYKONANIE ZAPISU Z NAGŁÓWKIEM CONTENT-TYPE
                 const response = await fetch(url, {
                     method: method,
                     headers: {
                         ...getAuthHeaders(),
-                        'Content-Type': 'application/json' // Konieczne, by Django widziało JSON
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify(data)
                 });
@@ -776,18 +777,17 @@
                 if (response.status === 401) { handleLogout(); return; }
 
                 if (response.ok) {
-                    console.log("Sukces!");
+                    console.log("Zapis zakończony sukcesem!");
                     document.getElementById('data-modal').style.display = "none";
-                    // Przeładuj widok
                     loadView(currentView);
                 } else {
                     const errorData = await response.json();
-                    console.error("Błąd z serwera:", errorData);
-                    modalError.textContent = `Błąd: ${JSON.stringify(errorData)}`;
+                    console.error("Błąd walidacji serwera:", errorData);
+                    modalError.textContent = `Błąd serwera: ${JSON.stringify(errorData)}`;
                 }
             } catch (error) {
-                console.error("Błąd sieciowy:", error);
-                modalError.textContent = "Wystąpił błąd podczas zapisywania danych.";
+                console.error("Błąd krytyczny handleSave:", error);
+                if (modalError) modalError.textContent = "Wystąpił błąd połączenia lub błąd wewnętrzny aplikacji.";
             }
         }
 
@@ -823,17 +823,37 @@
 
         deleteBtn.onclick = handleDelete;
 
+        async function deleteRecord(viewName, id) {
+            // Ustawiamy globalne zmienne, których używa Twoje handleDelete
+            currentView = viewName;
+            currentRecordId = id;
+
+            // Wywołujemy Twoją istniejącą funkcję
+            await handleDelete();
+        }
 
         // --- FUNKCJE RENDERUJĄCE WIDOKI ---
 
         // Helper dla generowania przycisków
         function getActionButtons(record, viewName) {
-            return `<button onclick="openModal('${viewName}', ${JSON.stringify(record).replace(/"/g, '&quot;')})">Edytuj</button>`;
+            // Używamy tylko ID rekordu, co zapobiega błędom przy przesyłaniu dużych obiektów w HTML
+            const id = record.id;
+
+            return `
+                <div class="action-buttons" style="display: flex; gap: 8px; justify-content: center;">
+                    <button class="btn-edit"
+                            onclick="openModal('${viewName}', ${id})"
+                            style="cursor: pointer; padding: 5px 12px; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 4px;">
+                        Edytuj
+                    </button>
+                    <button class="btn-delete"
+                            onclick="deleteRecord('${viewName}', ${id})"
+                            style="cursor: pointer; padding: 5px 12px; background-color: #ff4d4d; color: white; border: none; border-radius: 4px;">
+                        Usuń
+                    </button>
+                </div>
+            `;
         }
-
-        // ... (renderVehicles, renderDrivers, renderServiceEvents, renderDamageEvents, renderPolicies - bez zmian) ...
-        // Uwaga: Dla oszczędności miejsca pomijam powtarzanie tych funkcji, ale w rzeczywistym kodzie one muszą być.
-
         // Zmodyfikowana funkcja, aby upewnić się, że inne widoki działają
         async function renderVehicles() {
             const mainContent = document.getElementById('main-content');
@@ -844,7 +864,7 @@
 
             // Rozbudowany nagłówek - 11 kolumn
             // Lp(40px), Marka(1fr), Model(1fr), NrRej(110px), VIN(1.2fr), Paliwo(100px), Przebieg(100px), Firma(1fr), Użytkownik(1fr), Data(120px), Akcje(100px)
-            const gridLayout = "40px 100px 100px 100px 140px 90px 100px 90px 100px 100px 120px 100px 1fr 100px";
+            const gridLayout = "40px 100px 100px 100px 140px 130px 100px 90px 100px 100px 120px 100px 1fr 100px";
 
             mainContent.innerHTML = `
                 <div class="table-header" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; align-items: center;">
@@ -990,8 +1010,8 @@
             currentView = 'drivers';
             viewTitle.textContent = 'Użytkownicy (Kierowcy)';
 
-            // DEFINICJA SIATKI: Lp(40px), Kierowca(120px), Email(1fr), Firma(120px), Nr Pr(120px), Kat(60px), Badania(100px), Akcje(100px)
-            const gridLayout = "40px 120px 1fr 120px 120px 60px 110px 100px";
+            // Zwiększamy nieco kolumnę "Kierowca" (z 120px na 150px), by imię i nazwisko się zmieściło
+            const gridLayout = "40px 150px 1fr 120px 120px 60px 110px 100px";
 
             mainContent.innerHTML = `
                 <div class="table-header" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; padding: 10px; background: #ebedef; font-weight: bold; border-bottom: 2px solid #ccc;">
@@ -1019,7 +1039,6 @@
                 data.forEach((driver, index) => {
                     const row = document.createElement('div');
                     row.className = 'table-row';
-                    // WYMUSZAMY TEN SAM GRID CO W NAGŁÓWKU
                     row.style.display = 'grid';
                     row.style.gridTemplateColumns = gridLayout;
                     row.style.gap = '10px';
@@ -1027,13 +1046,22 @@
                     row.style.padding = '10px';
                     row.style.borderBottom = '1px solid #eee';
 
-                    // Logika dla daty badań (żeby nie było 'undefined')
+                    // --- NOWA LOGIKA SKŁADANIA NAZWY ---
+                    // Pobieramy imię i nazwisko z danych (które dodałeś w kroku 1 w DTO)
+                    const fName = driver.first_name || '';
+                    const lName = driver.last_name || '';
+                    const fullName = `${fName} ${lName}`.trim();
+
+                    // Jeśli fullName nie jest pusty, używamy go. W przeciwnym razie dajemy login (user_name)
+                    const displayName = fullName !== '' ? fullName : (driver.user_name || '---');
+                    // ----------------------------------
+
                     const dataBadan = driver.data_waznosci_badan || '---';
                     const kolorBadan = (dataBadan !== '---') ? 'green' : '#666';
 
                     row.innerHTML = `
                         <div>${index + 1}.</div>
-                        <div style="font-weight: bold;">${driver.user_name || '---'}</div>
+                        <div style="font-weight: bold;">${displayName}</div>
                         <div style="font-size: 0.9em; overflow: hidden; text-overflow: ellipsis;">${driver.email || '---'}</div>
                         <div>${driver.company_name || '<span style="color: #ccc;">Brak</span>'}</div>
                         <div style="font-family: monospace;">${driver.numer_prawa_jazdy || '---'}</div>

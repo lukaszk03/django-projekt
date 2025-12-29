@@ -126,7 +126,7 @@ class Vehicle(models.Model):
 class Driver(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, related_name='driver_profile', on_delete=models.CASCADE)
     numer_prawa_jazdy = models.CharField(max_length=50)
-    data_waznosci_prawa_jazdy = models.DateField()
+    data_waznosci_prawa_jazdy = models.DateField(null=True, blank=True)
     company = models.ForeignKey(FleetCompany, on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
