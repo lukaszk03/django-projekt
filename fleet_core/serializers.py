@@ -9,31 +9,31 @@ class VehicleDto(serializers.ModelSerializer):
     company_name = serializers.CharField(source='company.nazwa', read_only=True)
     fuel_type_display = serializers.CharField(source='get_fuel_type_display', read_only=True)
     assigned_user_name = serializers.ReadOnlyField(source='assigned_user.get_full_name')
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    typ_display = serializers.CharField(source='get_typ_pojazdu_display', read_only=True)
 
     class Meta:
         model = Vehicle
         fields = [
             'id', 'vin', 'registration_number', 'company', 'company_name',
             'is_active', 'przebieg', 'fuel_type', 'fuel_type_display',
-            'marka', 'model', 'data_pierwszej_rejestracji', 'assigned_user', 'assigned_user_name'
+            'marka', 'model', 'data_pierwszej_rejestracji', 'assigned_user', 'assigned_user_name',
+            'status', 'status_display', 'typ_pojazdu', 'typ_display', 'uwagi'
         ]
 
 # 2. SERIALIZER DLA UŻYTKOWNIKÓW (Kierowców)
 class DriverDto(serializers.ModelSerializer):
     # Weryfikacja: Czy user_name poprawnie mapuje się do pola 'username' w CustomUser?
-    user_name = serializers.CharField(source='user.username', read_only=True)
+    user_name = serializers.ReadOnlyField(source='user.username', default='Brak loginu')
+    email = serializers.ReadOnlyField(source='user.email', default='Brak email')
+    company_name = serializers.CharField(source='company.nazwa', read_only=True)  # Tylko do odczytu
 
     class Meta:
         model = Driver
         fields = [
-            'id',
-            'numer_prawa_jazdy',
-            'data_waznosci_prawa_jazdy',
-            'kategorie_prawa_jazdy',  # <-- DODAJ TO
-            'data_waznosci_badan',  # <-- DODAJ TO
-            'aktywny',
-            # Musimy tutaj podać pole z modelu CustomUser przez relację 'user'
-            'user_name'
+            'id', 'user', 'user_name', 'email', 'numer_prawa_jazdy',
+            'kategorie_prawa_jazdy', 'data_waznosci_badan',
+            'company', 'company_name'
         ]
 
 # 3. SERIALIZER DLA ZDARZEŃ SERWISOWYCH (ServiceEventDto)

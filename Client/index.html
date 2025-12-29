@@ -535,12 +535,27 @@
             // WIDOK POJAZDÓW - TUTAJ DODAŁEM NOWE POLA
             else if (viewName === 'vehicles') {
                 const sel = (val) => (record && record.fuel_type === val) ? 'selected' : '';
+                const selStatus = (val) => (record && record.status === val) ? 'selected' : '';
+                const selType = (val) => (record && record.typ_pojazdu === val) ? 'selected' : '';
                 formHtml = `
                     <label for="v_marka">Marka:</label>
                     <input type="text" id="v_marka" value="${record ? (record.marka || '') : ''}" placeholder="np. Toyota">
 
                     <label for="v_model">Model:</label>
                     <input type="text" id="v_model" value="${record ? (record.model || '') : ''}" placeholder="np. Corolla">
+
+                    <label for="v_type">Typ pojazdu:</label>
+                    <select id="v_type">
+                        <option value="OSOBOWE" ${selType('OSOBOWE')}>Osobowe</option>
+                        <option value="CIEZAROWE" ${selType('CIEZAROWE')}>Ciężarowe</option>
+                        <option value="AUTOBUSY" ${selType('AUTOBUSY')}>Autobusy</option>
+                        <option value="MOTOCYKLE" ${selType('MOTOCYKLE')}>Motocykle</option>
+                        <option value="SEDAN" ${selType('SEDAN')}>Sedan</option>
+                        <option value="SUV" ${selType('SUV')}>SUV</option>
+                        <option value="HATCHBACK" ${selType('HATCHBACK')}>Hatchback</option>
+                        <option value="KOMBI" ${selType('KOMBI')}>Kombi</option>
+                        <option value="COUPE" ${selType('COUPE')}>Coupé</option>
+                    </select>
 
                     <label for="reg_num">Nr Rejestracyjny:</label>
                     <input type="text" id="reg_num" value="${record ? record.registration_number : ''}" required>
@@ -571,6 +586,15 @@
 
                     <label for="v_assigned_user">ID Przypisanego Użytkownika (opcjonalnie):</label>
                     <input type="number" id="v_assigned_user" value="${record ? (record.assigned_user || '') : ''}">
+
+                    <label for="v_status">Status pojazdu:</label>
+                    <select id="v_status">
+                        <option value="SPRAWNY" ${selStatus('SPRAWNY')}>Sprawny</option>
+                        <option value="NIESPRAWNY" ${selStatus('NIESPRAWNY')}>Niesprawny</option>
+                    </select>
+
+                    <label for="v_uwagi">Uwagi:</label>
+                    <textarea id="v_uwagi" rows="3" placeholder="Dodatkowe informacje...">${record ? (record.uwagi || '') : ''}</textarea>
                 `;
             }
             else if (viewName === 'damages') {
@@ -591,6 +615,8 @@
             }
             else if (viewName === 'drivers') {
                 formHtml = `
+                    <label for="d_company">ID Firmy:</label>
+                    <input type="number" id="d_company_id" value="${record ? record.company : ''}" placeholder="Wpisz ID firmy">
                     <label>Numer Prawa Jazdy:</label>
                     <input type="text" id="prawa_jazdy_num" value="${record ? record.numer_prawa_jazdy : ''}">
                     <label>Kategorie:</label>
@@ -704,7 +730,10 @@
                         marka: document.getElementById('v_marka').value,
                         model: document.getElementById('v_model').value,
                         data_pierwszej_rejestracji: rawDate || null,
-                        assigned_user: rawUser ? parseInt(rawUser) : null
+                        assigned_user: rawUser ? parseInt(rawUser) : null,
+                        status: document.getElementById('v_status').value,
+                        typ_pojazdu: document.getElementById('v_type').value,
+                        uwagi: document.getElementById('v_uwagi').value || null
                     };
                 }
                 else if (currentView === 'damages') {
@@ -720,6 +749,7 @@
                     data = {
                         numer_prawa_jazdy: document.getElementById('prawa_jazdy_num').value,
                         kategorie_prawa_jazdy: document.getElementById('kat_prawa_jazdy').value,
+                        company: parseInt(document.getElementById('d_company_id').value) || null, // Dodajemy ID firmy
                         data_waznosci_badan: document.getElementById('data_badan_val').value || null
                     };
                 }
@@ -806,18 +836,22 @@
 
         // Zmodyfikowana funkcja, aby upewnić się, że inne widoki działają
         async function renderVehicles() {
+            const mainContent = document.getElementById('main-content');
+            if (!mainContent) return;
+
             currentView = 'vehicles';
             viewTitle.textContent = 'Pojazdy';
 
             // Rozbudowany nagłówek - 11 kolumn
             // Lp(40px), Marka(1fr), Model(1fr), NrRej(110px), VIN(1.2fr), Paliwo(100px), Przebieg(100px), Firma(1fr), Użytkownik(1fr), Data(120px), Akcje(100px)
-            const gridLayout = "40px 1fr 1fr 110px 1.2fr 100px 100px 1fr 1fr 120px 100px";
+            const gridLayout = "40px 100px 100px 100px 140px 90px 100px 90px 100px 100px 120px 100px 1fr 100px";
 
             mainContent.innerHTML = `
                 <div class="table-header" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; align-items: center;">
                     <div>Lp.</div>
                     <div>Marka</div>
                     <div>Model</div>
+                    <div>Typ</div>
                     <div>Nr Rej.</div>
                     <div>VIN</div>
                     <div>Paliwo</div>
@@ -825,6 +859,8 @@
                     <div>Firma</div>
                     <div>Użytkownik</div>
                     <div>Data pierwszej rejestracji</div>
+                    <div>Status</div>
+                    <div>Uwagi</div>
                     <div>Akcje</div>
                 </div>
                 <div id="data-list">Ładowanie pojazdów...</div>`;
@@ -844,11 +880,11 @@
                 dataListDiv.innerHTML = '';
 
                 vehicles.forEach((vehicle, index) => {
-                    const statusColor = vehicle.is_active ? 'green' : '#ffc107';
+                    //const statusColor = vehicle.is_active ? 'green' : '#ffc107';
                     const statusText = vehicle.is_active ? 'Aktywny' : 'Serwis';
                     const companyName = vehicle.company_name || 'Brak Firmy';
                     const paliwo = vehicle.fuel_type_display || vehicle.fuel_type || '-';
-
+                    const statusColor = vehicle.status === 'SPRAWNY' ? '#28a745' : '#dc3545';
                     const row = document.createElement('div');
                     row.className = 'table-row';
                     row.style.display = 'grid';
@@ -860,13 +896,26 @@
                         <div>${index + 1}.</div>
                         <div style="font-weight: bold;">${vehicle.marka || '---'}</div>
                         <div>${vehicle.model || '---'}</div>
+                        <div style="font-size: 0.9em;">${vehicle.typ_display || '---'}</div>
+
                         <div><span class="badge" style="border: 1px solid #ccc; padding: 2px 5px; border-radius: 4px; background: #f9f9f9;">${vehicle.registration_number}</span></div>
                         <div style="font-size: 0.85em; color: #555;">${vehicle.vin}</div>
+
+
                         <div>${paliwo}</div>
                         <div>${vehicle.przebieg ? vehicle.przebieg.toLocaleString() : 'N/A'} km</div>
                         <div>${companyName}</div>
                         <div>${vehicle.assigned_user_name || '<span style="color: #999;">Brak</span>'}</div>
                         <div style="font-size: 0.9em;">${vehicle.data_pierwszej_rejestracji || '---'}</div>
+
+                        <div style="color: ${statusColor}; font-weight: bold; font-size: 0.9em;">
+                            ${vehicle.status_display || '---'}
+                        </div>
+
+                        <div title="${vehicle.uwagi || ''}" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-style: italic; color: #666; font-size: 0.85em;">
+                            ${vehicle.uwagi || '---'}
+                        </div>
+
                         <div>${getActionButtons(vehicle, 'vehicles')}</div>
                     `;
                     dataListDiv.appendChild(row);
@@ -935,55 +984,68 @@
                  // Funkcje dla innych widoków - placeholdery
                  // Widok Kierowców
         async function renderDrivers() {
-            viewTitle.textContent = 'Użytkownicy (Kierowcy)';
-            const token = localStorage.getItem('access_token');
+            const mainContent = document.getElementById('main-content');
+            if (!mainContent) return;
 
-            // Przygotowanie tabeli
+            currentView = 'drivers';
+            viewTitle.textContent = 'Użytkownicy (Kierowcy)';
+
+            // DEFINICJA SIATKI: Lp(40px), Kierowca(120px), Email(1fr), Firma(120px), Nr Pr(120px), Kat(60px), Badania(100px), Akcje(100px)
+            const gridLayout = "40px 120px 1fr 120px 120px 60px 110px 100px";
+
             mainContent.innerHTML = `
-                <div class="table-header" style="grid-template-columns: 50px 1fr 1fr 1fr 1fr 120px 120px;">
+                <div class="table-header" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; padding: 10px; background: #ebedef; font-weight: bold; border-bottom: 2px solid #ccc;">
                     <div>Lp.</div>
                     <div>Kierowca</div>
+                    <div>Email</div>
+                    <div>Firma</div>
                     <div>Nr Pr. Jazdy</div>
-                    <div>Kategorie</div>
-                    <div>Ważność PJ</div>
+                    <div>Kat.</div>
                     <div>Badania lek.</div>
-                    <div>Akcje</div>
+                    <div style="text-align: center;">Akcje</div>
                 </div>
                 <div id="data-list">Ładowanie...</div>
             `;
 
+            const dataList = document.getElementById('data-list');
+
             try {
-                const response = await fetch('http://127.0.0.1:8000/api/drivers/', {
-                    headers: { 'Authorization': 'Bearer ' + token }
+                const response = await fetch(`${API_BASE}drivers/`, {
+                    headers: getAuthHeaders()
                 });
-                const drivers = await response.json();
-                const dataListDiv = document.getElementById('data-list');
-                dataListDiv.innerHTML = '';
+                const data = await response.json();
 
-                drivers.forEach((driver, index) => {
-                    // Sprawdzanie czy badania są aktualne
-                    const dzis = new Date();
-                    const dataBadan = driver.data_waznosci_badan ? new Date(driver.data_waznosci_badan) : null;
-                    const czyPrzeterminowane = dataBadan && dataBadan < dzis;
-
+                dataList.innerHTML = '';
+                data.forEach((driver, index) => {
                     const row = document.createElement('div');
                     row.className = 'table-row';
-                    row.style.gridTemplateColumns = "50px 1fr 1fr 1fr 1fr 120px 120px";
+                    // WYMUSZAMY TEN SAM GRID CO W NAGŁÓWKU
+                    row.style.display = 'grid';
+                    row.style.gridTemplateColumns = gridLayout;
+                    row.style.gap = '10px';
+                    row.style.alignItems = 'center';
+                    row.style.padding = '10px';
+                    row.style.borderBottom = '1px solid #eee';
+
+                    // Logika dla daty badań (żeby nie było 'undefined')
+                    const dataBadan = driver.data_waznosci_badan || '---';
+                    const kolorBadan = (dataBadan !== '---') ? 'green' : '#666';
+
                     row.innerHTML = `
                         <div>${index + 1}.</div>
-                        <div><strong>${driver.user_name}</strong></div>
-                        <div>${driver.numer_prawa_jazdy}</div>
-                        <div>${driver.kategorie_prawa_jazdy || 'B'}</div>
-                        <div>${driver.data_waznosci_prawa_jazdy}</div>
-                        <div style="color: ${czyPrzeterminowane ? 'red' : 'green'}; font-weight: bold;">
-                            ${driver.data_waznosci_badan || 'Brak'}
-                        </div>
-                        <div>${getActionButtons(driver, 'drivers')}</div>
+                        <div style="font-weight: bold;">${driver.user_name || '---'}</div>
+                        <div style="font-size: 0.9em; overflow: hidden; text-overflow: ellipsis;">${driver.email || '---'}</div>
+                        <div>${driver.company_name || '<span style="color: #ccc;">Brak</span>'}</div>
+                        <div style="font-family: monospace;">${driver.numer_prawa_jazdy || '---'}</div>
+                        <div style="text-align: center;">${driver.kategorie_prawa_jazdy || '---'}</div>
+                        <div style="color: ${kolorBadan}; font-weight: bold; font-size: 0.85em;">${dataBadan}</div>
+                        <div style="text-align: center;">${getActionButtons(driver, 'drivers')}</div>
                     `;
-                    dataListDiv.appendChild(row);
+                    dataList.appendChild(row);
                 });
-            } catch (err) {
-                document.getElementById('data-list').innerHTML = "Błąd ładowania: " + err;
+            } catch (error) {
+                console.error("Błąd ładowania kierowców:", error);
+                dataList.innerHTML = '<div style="color: red; padding: 10px;">Błąd ładowania danych.</div>';
             }
         }
 

@@ -1,6 +1,8 @@
 # fleet_core/models.py
 
 from django.db import models
+from django.conf import settings
+from django.contrib.auth.models import User # To jest wbudowany model Django
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError  # <-- Upewnij się, że to masz!
 
@@ -45,6 +47,28 @@ class Vehicle(models.Model):
     model = models.CharField(max_length=100, blank=True, null=True)
     data_pierwszej_rejestracji = models.DateField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
+
+    STATUS_CHOICES = [
+        ('SPRAWNY', 'Sprawny'),
+        ('NIESPRAWNY', 'Niesprawny'),
+    ]
+
+    TYPE_CHOICES = [
+        ('OSOBOWE', 'Osobowe'),
+        ('CIEZAROWE', 'Ciężarowe'),
+        ('AUTOBUSY', 'Autobusy'),
+        ('MOTOCYKLE', 'Motocykle'),
+        ('SEDAN', 'Sedan'),
+        ('SUV', 'SUV'),
+        ('HATCHBACK', 'Hatchback'),
+        ('KOMBI', 'Kombi'),
+        ('COUPE', 'Coupé'),
+    ]
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='SPRAWNY')
+    typ_pojazdu = models.CharField(max_length=30, choices=TYPE_CHOICES, default='OSOBOWE')
+    uwagi = models.TextField(blank=True, null=True)
+
     # Definicja typów paliwa (możesz to dać nad klasą Vehicle)
     fuel_type = models.CharField(
         max_length=20,
@@ -100,9 +124,13 @@ class Vehicle(models.Model):
 
 # Model Kierowcy 
 class Driver(models.Model):
-    user = models.OneToOneField('CustomUser', on_delete=models.CASCADE)
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, related_name='driver_profile', on_delete=models.CASCADE)
     numer_prawa_jazdy = models.CharField(max_length=50)
     data_waznosci_prawa_jazdy = models.DateField()
+    company = models.ForeignKey(FleetCompany, on_delete=models.SET_NULL, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.user.get_full_name()} ({self.company.nazwa if self.company else 'Brak firmy'})"
 
     # --- NOWE POLA ---
     kategorie_prawa_jazdy = models.CharField(
@@ -120,7 +148,9 @@ class Driver(models.Model):
     aktywny = models.BooleanField(default=True)
 
     def __str__(self):
-        return f"{self.user.username} - {self.kategorie_prawa_jazdy}"
+        # Bezpieczne pobieranie nazwy użytkownika
+        name = self.user.username if self.user else "Nieznany"
+        return f"{name} - {self.kategorie_prawa_jazdy}"
 
 # Rozszerzony User
 class CustomUser(AbstractUser):
