@@ -282,3 +282,18 @@ class DamageEvent(models.Model):
     class Meta:
         verbose_name = "Zdarzenie Szkodowe"
         verbose_name_plural = "Zdarzenia Szkodowe"
+
+
+# ----------------------------------------------------
+# MODEL PRZEKAZANIA POJAZDU (VehicleHandover)
+# ----------------------------------------------------
+class VehicleHandover(models.Model):
+    kierowca = models.ForeignKey('Driver', on_delete=models.CASCADE, related_name='handovers')
+    pojazd = models.ForeignKey('Vehicle', on_delete=models.CASCADE, related_name='handovers')
+    data_wydania = models.DateField(verbose_name="Data Wydania")
+    data_zwrotu = models.DateField(verbose_name="Data Zwrotu", null=True, blank=True)
+    uwagi = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.pojazd} -> {self.kierowca} ({self.data_wydania})"
+

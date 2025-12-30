@@ -1,10 +1,9 @@
 # Master/Server/fleet_core/serializers.py
 
 from rest_framework import serializers
-# DODAJ IMPORT InsurancePolicy
-from .models import Vehicle, Driver, ServiceEvent, DamageEvent, FleetCompany, InsurancePolicy
+from .models import Vehicle, Driver, ServiceEvent, DamageEvent, FleetCompany, InsurancePolicy, VehicleHandover
 
-# 1. SERIALIZER DLA POJAZDÓW (VehicleDto)
+# 1. SERIALIZER DLA POJAZDÓW
 class VehicleDto(serializers.ModelSerializer):
     company_name = serializers.CharField(source='company.nazwa', read_only=True)
     fuel_type_display = serializers.CharField(source='get_fuel_type_display', read_only=True)
@@ -21,14 +20,13 @@ class VehicleDto(serializers.ModelSerializer):
             'status', 'status_display', 'typ_pojazdu', 'typ_display', 'uwagi'
         ]
 
-# 2. SERIALIZER DLA UŻYTKOWNIKÓW (Kierowców)
+# 2. SERIALIZER DLA UŻYTKOWNIKÓW
 class DriverDto(serializers.ModelSerializer):
     first_name = serializers.ReadOnlyField(source='user.first_name', default='')
     last_name = serializers.ReadOnlyField(source='user.last_name', default='')
-    # Weryfikacja: Czy user_name poprawnie mapuje się do pola 'username' w CustomUser?
     user_name = serializers.ReadOnlyField(source='user.username', default='Brak loginu')
     email = serializers.ReadOnlyField(source='user.email', default='Brak email')
-    company_name = serializers.CharField(source='company.nazwa', read_only=True)  # Tylko do odczytu
+    company_name = serializers.CharField(source='company.nazwa', read_only=True)
 
     class Meta:
         model = Driver
@@ -38,27 +36,19 @@ class DriverDto(serializers.ModelSerializer):
             'data_waznosci_badan', 'company', 'company_name'
         ]
 
-# 3. SERIALIZER DLA ZDARZEŃ SERWISOWYCH (ServiceEventDto)
-class ServiceEventDto(serializers.ModelSerializer):
-    pojazd_nr_rej = serializers.CharField(source='pojazd.registration_number', read_only=True)
-
-    class Meta:
-        model = ServiceEvent # Używamy ServiceEvent
-        fields = ['id', 'opis', 'koszt', 'data_serwisu', 'pojazd_nr_rej']
-
-
-# 4. SERIALIZER DLA ZDARZEŃ SZKODOWYCH (DamageEventDto)
+# 3. SZKODY
 class DamageEventDto(serializers.ModelSerializer):
     pojazd_nr_rej = serializers.CharField(source='pojazd.registration_number', read_only=True)
 
     class Meta:
         model = DamageEvent
-        fields = ['id', 'pojazd', 'pojazd_nr_rej', 'opis', 'data_zdarzenia', 'szacowany_koszt', 'zgloszony_do_ubezpieczyciela', 'status_naprawy']
-        # Pole 'pojazd' jest potrzebne do tworzenia/aktualizacji
-        extra_kwargs = {'pojazd': {'write_only': True}}
+        fields = ['id', 'pojazd', 'pojazd_nr_rej', 'opis', 'data_zdarzenia', 'szacowany_koszt',
+                  'zgloszony_do_ubezpieczyciela', 'status_naprawy']
 
+        # USUNĄŁEM LINIĘ PONIŻEJ (extra_kwargs), ABY FORMULARZ WIDZIAŁ ID POJAZDU:
+        # extra_kwargs = {'pojazd': {'write_only': True}}
 
-# 5. NOWY SERIALIZER DLA POLIS
+# 4. POLISY
 class InsurancePolicyDto(serializers.ModelSerializer):
     pojazd_nr_rej = serializers.CharField(source='pojazd.registration_number', read_only=True)
 
@@ -66,3 +56,18 @@ class InsurancePolicyDto(serializers.ModelSerializer):
         model = InsurancePolicy
         fields = ['id', 'pojazd', 'pojazd_nr_rej', 'numer_polisy', 'ubezpieczyciel', 'data_waznosci_oc', 'data_waznosci_ac', 'koszt']
         extra_kwargs = {'pojazd': {'write_only': True}}
+
+# 5. PRZEKAZANIA (TUTAJ BYŁ BŁĄD)
+class VehicleHandoverDto(serializers.ModelSerializer):
+    imie = serializers.ReadOnlyField(source='kierowca.user.first_name')
+    nazwisko = serializers.ReadOnlyField(source='kierowca.user.last_name')
+    firma = serializers.ReadOnlyField(source='kierowca.company.nazwa')
+    marka = serializers.ReadOnlyField(source='pojazd.marka')
+    model = serializers.ReadOnlyField(source='pojazd.model')
+    rejestracja = serializers.ReadOnlyField(source='pojazd.registration_number')
+
+    # POPRAWIONE WCIĘCIE PONIŻEJ:
+    class Meta:
+        model = VehicleHandover
+        fields = ['id', 'kierowca', 'pojazd', 'imie', 'nazwisko', 'firma',
+                  'marka', 'model', 'rejestracja', 'data_wydania', 'data_zwrotu', 'uwagi']

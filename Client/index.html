@@ -177,7 +177,7 @@
         }
         /* Kolory dla różnych typów zdarzeń (te same co kropki w menu) */
         .event-review { background-color: #28a745; } /* Przegląd */
-        .event-inspection { background-color: #ffc107; } /* Badanie/Inspekcja/Legalizacja */
+        .event-inspection { background-color: #ffc107; } /* Badanie */
         .event-policy { background-color: #007bff; } /* Polisa */
         .event-repair { background-color: #dc3545; } /* Naprawa */
 
@@ -235,9 +235,8 @@
                 <div style="padding: 10px 20px; font-size: 1.5em; color: #007bff; font-weight: 900;">FLEETIO</div>
 
                 <div class="menu-item active" data-view="vehicles"><span>🚗 Pojazdy</span></div>
-                <div class="menu-item" data-view="drivers"><i class="fas fa-users"></i> Użytkownicy</div>
+                <div class="menu-item" data-view="drivers"><i class="fas fa-users"></i>👤 Użytkownicy</div>
                 <div class="menu-item" data-view="handover">⇌ Przekazania</div>
-                <div class="menu-item" data-view="inspection">📜 Inspekcje</div>
                 <div class="menu-item" data-view="damages">⚠️ Szkody</div>
 
                 <div class="menu-item" data-view="calendar">📅 Terminarz</div>
@@ -246,7 +245,6 @@
                 <div class="menu-subitem" data-view="tech_inspections"><span class="color-dot dot-inspection"></span>Badania techniczne</div>
                 <div class="menu-subitem" data-view="reviews"><span class="color-dot dot-review"></span>Przeglądy</div>
                 <div class="menu-subitem" data-view="repairs"><span class="color-dot dot-repair"></span>Naprawy</div>
-                <div class="menu-subitem" data-view="legalization"><span class="color-dot dot-inspection"></span>Legalizacje</div>
 
                 <div class="menu-item" data-view="leasing">🧾 Leasingi</div>
                 <div class="menu-item" data-view="hr_docs">📄 Dokumenty kadrowe</div>
@@ -435,6 +433,7 @@
             'vehicles': 'vehicles',
             'drivers': 'drivers',
             'damages': 'damage_events',
+            'handover': 'handovers', // <--- DODAJ TĘ LINIĘ (zakładając, że endpoint to /api/handovers/)
             'inspection': 'service_events',
             'repairs': 'service_events',
             'reviews': 'service_events',
@@ -542,8 +541,6 @@
                         <option value="BADANIE_TECH">Badanie Techniczne</option>
                         <option value="PRZEGLAD">Przegląd Okresowy</option>
                         <option value="NAPRAWA">Naprawa</option>
-                        <option value="INSPEKCJA">Inspekcja</option>
-                        <option value="LEGALIZACJA">Legalizacja</option>
                         <option value="POLICY_OC">Polisa OC/AC</option>
                     </select>
                     <label for="pojazd_id_selector">Pojazd:</label>
@@ -615,6 +612,51 @@
                     <input type="date" id="data_badan_val" value="${record?.data_waznosci_badan || ''}">
                 `;
             }
+
+            // PRZEKAZANIA ---
+            else if (viewName === 'handover') {
+                formHtml = `
+                    <label>ID Pojazdu:</label>
+                    <input type="number" id="h_pojazd_id" value="${record?.pojazd || ''}" required>
+
+                    <label>ID Kierowcy:</label>
+                    <input type="number" id="h_kierowca_id" value="${record?.kierowca || ''}" required>
+
+                    <label>Data Przypisania (Wydania):</label>
+                    <input type="date" id="h_data_wydania" value="${record?.data_wydania || ''}" required>
+
+                    <label>Data Oddania (opcjonalnie):</label>
+                    <input type="date" id="h_data_zwrotu" value="${record?.data_zwrotu || ''}">
+
+                    <label>Uwagi:</label>
+                    <textarea id="h_uwagi">${record?.uwagi || ''}</textarea>
+                `;
+            }
+
+            // 5. SZKODY (DAMAGES) - TEGO BRAKOWAŁO!
+            else if (viewName === 'damages') {
+                const sel = (val) => (record?.status_naprawy === val ? 'selected' : '');
+                formHtml = `
+                    <label>ID Pojazdu:</label>
+                    <input type="number" id="pojazd_id" value="${record?.pojazd || ''}" required>
+
+                    <label>Data Zdarzenia:</label>
+                    <input type="date" id="data_zdarzenia_val" value="${record?.data_zdarzenia || ''}" required>
+
+                    <label>Status Naprawy:</label>
+                    <select id="status_naprawy_val">
+                        <option value="ZGLOSZONA" ${sel('ZGLOSZONA')}>Zgłoszona</option>
+                        <option value="W_NAPRAWIE" ${sel('W_NAPRAWIE')}>W naprawie</option>
+                        <option value="ZAMKNIETA" ${sel('ZAMKNIETA')}>Zamknięta</option>
+                    </select>
+
+                    <label>Opis szkody:</label>
+                    <textarea id="opis_szkody" rows="4" required>${record?.opis || ''}</textarea>
+                `;
+            }
+
+
+
             // 4. EDYCJA ISTNIEJĄCYCH TERMINÓW
             else if (isCalendarEventView && currentRecordId) {
                  const endpointForType = endpointMap[viewName];
@@ -649,9 +691,9 @@
         }
 
 
-        /** Obsługuje logikę zapisu (POST - dodawanie / PUT - edycja) */
+                /** Obsługuje logikę zapisu (POST - dodawanie / PUT - edycja) */
         async function handleSave(event) {
-            // 1. Zatrzymujemy domyślną akcję (zapobiega to zmianie na GET i odświeżeniu strony)
+            // 1. Zatrzymujemy domyślną akcję (zapobiega odświeżeniu strony)
             if (event && event.preventDefault) event.preventDefault();
 
             const modalError = document.getElementById('modal-error');
@@ -659,17 +701,19 @@
 
             const eventTypeSelector = document.getElementById('event_type_selector');
             let data = {};
+
+            // Używamy currentView (globalna zmienna), a nie viewName
             let endpoint = endpointMap[currentView] || currentView;
 
             // Ustalamy metodę i URL
             let method = currentRecordId ? 'PUT' : 'POST';
             let url = currentRecordId ? `${API_BASE}${endpoint}/${currentRecordId}/` : `${API_BASE}${endpoint}/`;
 
-            console.log(`Próba zapisu: ${method} na ${url}`);
+            console.log(`Próba zapisu: ${method} na ${url} (Widok: ${currentView})`);
 
             try {
                 if (eventTypeSelector && !currentRecordId) {
-                    // LOGIKA DLA NOWEGO TERMINU (Z KALENDARZA)
+                    // --- LOGIKA DLA NOWEGO TERMINU (Z KALENDARZA) ---
                     const selectedType = eventTypeSelector.value;
                     const pojazdId = document.getElementById('pojazd_id_selector').value;
                     const dataTerminu = document.getElementById('data_terminu').value;
@@ -695,101 +739,113 @@
                     url = `${API_BASE}${endpoint}/`;
                     method = 'POST';
                 }
-                else if (currentView === 'vehicles') {
-                    data = {
-                        registration_number: document.getElementById('reg_num').value,
-                        vin: document.getElementById('vin_num').value,
-                        fuel_type: document.getElementById('fuel_type_input').value,
-                        przebieg: parseFloat(document.getElementById('przebieg_val').value) || 0,
-                        company: parseInt(document.getElementById('company_id').value) || null,
-                        is_active: true,
-                        marka: document.getElementById('v_marka').value,
-                        model: document.getElementById('v_model').value,
-                        data_pierwszej_rejestracji: document.getElementById('v_first_reg').value || null,
-                        assigned_user: document.getElementById('v_assigned_user').value ? parseInt(document.getElementById('v_assigned_user').value) : null,
-                        status: document.getElementById('v_status').value,
-                        typ_pojazdu: document.getElementById('v_type').value,
-                        uwagi: document.getElementById('v_uwagi').value || null
-                    };
-                }
-                else if (currentView === 'damages') {
-                    data = {
-                        pojazd: parseInt(document.getElementById('pojazd_id').value),
-                        opis: document.getElementById('opis_szkody').value,
-                        data_zdarzenia: document.getElementById('data_zdarzenia_val').value,
-                        status_naprawy: document.getElementById('status_naprawy_val').value,
-                        szacowany_koszt: 0
-                    };
-                }
-                else if (currentView === 'drivers') {
-                    const userIdInput = document.getElementById('d_user_id');
-                    const userId = userIdInput ? userIdInput.value : null;
+        // --- POJAZDY ---
+        else if (currentView === 'vehicles') {
+            data = {
+                registration_number: document.getElementById('reg_num').value,
+                vin: document.getElementById('vin_num').value,
+                fuel_type: document.getElementById('fuel_type_input').value,
+                przebieg: parseFloat(document.getElementById('przebieg_val').value) || 0,
+                company: parseInt(document.getElementById('company_id').value) || null,
+                is_active: true,
+                marka: document.getElementById('v_marka').value,
+                model: document.getElementById('v_model').value,
+                data_pierwszej_rejestracji: document.getElementById('v_first_reg').value || null,
+                assigned_user: document.getElementById('v_assigned_user').value ? parseInt(document.getElementById('v_assigned_user').value) : null,
+                status: document.getElementById('v_status').value,
+                typ_pojazdu: document.getElementById('v_type').value,
+                uwagi: document.getElementById('v_uwagi').value || null
+            };
+        }
+        // --- SZKODY ---
+        else if (currentView === 'damages') {
+            data = {
+                pojazd: parseInt(document.getElementById('pojazd_id').value),
+                opis: document.getElementById('opis_szkody').value,
+                data_zdarzenia: document.getElementById('data_zdarzenia_val').value,
+                status_naprawy: document.getElementById('status_naprawy_val').value,
+                szacowany_koszt: 0
+            };
+        }
+        // --- KIEROWCY ---
+        else if (currentView === 'drivers') {
+            const userIdInput = document.getElementById('d_user_id');
+            const userId = userIdInput ? userIdInput.value : null;
 
-                    if (!userId && !currentRecordId) {
-                        alert("ID użytkownika jest wymagane do utworzenia profilu kierowcy!");
-                        return;
-                    }
+            if (!userId && !currentRecordId) {
+                alert("ID użytkownika jest wymagane do utworzenia profilu kierowcy!");
+                return;
+            }
 
-                    data = {
-                        // Przy PUT (edycji) pole user może być disabled, więc bierzemy wartość tylko jeśli istnieje
-                        ...(userId && { user: parseInt(userId) }),
-                        numer_prawa_jazdy: document.getElementById('prawa_jazdy_num').value,
-                        kategorie_prawa_jazdy: document.getElementById('kat_prawa_jazdy').value,
+            data = {
+                ...(userId && { user: parseInt(userId) }),
+                numer_prawa_jazdy: document.getElementById('prawa_jazdy_num').value,
+                kategorie_prawa_jazdy: document.getElementById('kat_prawa_jazdy').value,
+                data_waznosci_prawa_jazdy: document.getElementById('data_waznosci_pj_val').value || null,
+                company: parseInt(document.getElementById('d_company_id').value) || null,
+                data_waznosci_badan: document.getElementById('data_badan_val').value || null
+            };
+        }
+        // --- PRZEKAZANIA (TUTAJ BYŁ BŁĄD) ---
+        else if (currentView === 'handover') {
+            // Tutaj pobieramy wartości z inputów zdefiniowanych w openModal
+            // Upewnij się, że w openModal używasz tych samych ID (h_pojazd_id, h_kierowca_id)
+            data = {
+                pojazd: parseInt(document.getElementById('h_pojazd_id').value),
+                kierowca: parseInt(document.getElementById('h_kierowca_id').value),
+                data_wydania: document.getElementById('h_data_wydania').value,
+                data_zwrotu: document.getElementById('h_data_zwrotu').value || null,
+                uwagi: document.getElementById('h_uwagi').value
+            };
+        }
+        // --- EDYCJA ZDARZEŃ SERWISOWYCH I POLIS (inne widoki) ---
+        else if (currentRecordId) {
+            const resolvedEndpoint = endpointMap[currentView] || currentView;
 
-                        // --- KLUCZOWA POPRAWKA: Przesyłamy datę ważności PJ ---
-                        data_waznosci_prawa_jazdy: document.getElementById('data_waznosci_pj_val').value || null,
-
-                        company: parseInt(document.getElementById('d_company_id').value) || null,
-                        data_waznosci_badan: document.getElementById('data_badan_val').value || null
-                    };
-                }
-                else if (currentRecordId) {
-                    // EDYCJA ZDARZEŃ SERWISOWYCH I POLIS (Gdy viewName to np. 'repairs' lub 'policies')
-                    const resolvedEndpoint = endpointMap[currentView] || currentView;
-
-                    if (resolvedEndpoint === 'service_events') {
-                        data = {
-                            pojazd: parseInt(document.getElementById('pojazd_id').value),
-                            opis: document.getElementById('opis_serwisu').value,
-                            koszt: parseFloat(document.getElementById('koszt_val').value) || 0,
-                            data_serwisu: document.getElementById('data_serwisu_val').value,
-                            typ_zdarzenia: document.getElementById('typ_zdarzenia_val').value
-                        };
-                    } else if (resolvedEndpoint === 'policies') {
-                        data = {
-                            pojazd: parseInt(document.getElementById('pojazd_id').value),
-                            numer_polisy: document.getElementById('numer_polisy').value,
-                            data_waznosci_oc: document.getElementById('data_waznosci_oc').value,
-                            data_waznosci_ac: document.getElementById('data_waznosci_ac').value || null
-                        };
-                    }
-                }
-
-                const response = await fetch(url, {
-                    method: method,
-                    headers: {
-                        ...getAuthHeaders(),
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
-
-                if (response.status === 401) { handleLogout(); return; }
-
-                if (response.ok) {
-                    console.log("Zapis zakończony sukcesem!");
-                    document.getElementById('data-modal').style.display = "none";
-                    loadView(currentView);
-                } else {
-                    const errorData = await response.json();
-                    console.error("Błąd walidacji serwera:", errorData);
-                    modalError.textContent = `Błąd serwera: ${JSON.stringify(errorData)}`;
-                }
-            } catch (error) {
-                console.error("Błąd krytyczny handleSave:", error);
-                if (modalError) modalError.textContent = "Wystąpił błąd połączenia lub błąd wewnętrzny aplikacji.";
+            if (resolvedEndpoint === 'service_events') {
+                data = {
+                    pojazd: parseInt(document.getElementById('pojazd_id').value),
+                    opis: document.getElementById('opis_serwisu').value,
+                    koszt: parseFloat(document.getElementById('koszt_val').value) || 0,
+                    data_serwisu: document.getElementById('data_serwisu_val').value,
+                    typ_zdarzenia: document.getElementById('typ_zdarzenia_val').value
+                };
+            } else if (resolvedEndpoint === 'policies') {
+                data = {
+                    pojazd: parseInt(document.getElementById('pojazd_id').value),
+                    numer_polisy: document.getElementById('numer_polisy').value,
+                    data_waznosci_oc: document.getElementById('data_waznosci_oc').value,
+                    data_waznosci_ac: document.getElementById('data_waznosci_ac').value || null
+                };
             }
         }
+
+        // WYSYŁKA DANYCH
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                ...getAuthHeaders(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (response.status === 401) { handleLogout(); return; }
+
+        if (response.ok) {
+            console.log("Zapis zakończony sukcesem!");
+            document.getElementById('data-modal').style.display = "none";
+            loadView(currentView);
+        } else {
+            const errorData = await response.json();
+            console.error("Błąd walidacji serwera:", errorData);
+            modalError.textContent = `Błąd: ${JSON.stringify(errorData)}`;
+        }
+    } catch (error) {
+        console.error("Błąd krytyczny handleSave:", error);
+        if (modalError) modalError.textContent = "Wystąpił błąd po stronie przeglądarki (sprawdź konsolę F12).";
+    }
+}
 
 
         /** Obsługuje logikę usuwania (DELETE) - bez zmian */
@@ -952,7 +1008,6 @@
                 'repairs': {title: 'Naprawy', type: 'NAPRAWA'},
                 'reviews': {title: 'Przeglądy Okresowe', type: 'PRZEGLAD'},
                 'tech_inspections': {title: 'Badania Techniczne', type: 'BADANIE_TECH'},
-                'legalization': {title: 'Legalizacje', type: 'LEGALIZACJA'}
             };
             const currentFilter = filterMap[filterType] || {title: 'Zdarzenia Serwisowe', type: null};
             currentView = filterType || 'service_events';
@@ -1077,6 +1132,81 @@
             }
         }
 
+        async function renderHandovers() {
+            const mainContent = document.getElementById('main-content');
+            if (!mainContent) return;
+
+            currentView = 'handover';
+            viewTitle.textContent = 'Przekazania Pojazdów';
+
+            // Definiujemy szerokość kolumn
+            const gridLayout = "40px 100px 100px 120px 100px 100px 100px 110px 110px 100px";
+
+            // 1. NAJPIERW GENERUJEMY NAGŁÓWKI (one muszą się pojawić zawsze)
+            mainContent.innerHTML = `
+                <div class="table-header" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; padding: 10px; background: #ebedef; font-weight: bold; border-bottom: 2px solid #ccc; font-size: 0.85em;">
+                    <div>Lp.</div>
+                    <div>Imię</div>
+                    <div>Nazwisko</div>
+                    <div>Firma</div>
+                    <div>Marka</div>
+                    <div>Model</div>
+                    <div>Rejestracja</div>
+                    <div>Data Przyp.</div>
+                    <div>Data Oddania</div>
+                    <div style="text-align: center;">Akcje</div>
+                </div>
+                <div id="data-list">Ładowanie danych...</div>
+            `;
+
+            const dataList = document.getElementById('data-list');
+
+            try {
+                const response = await fetch(`${API_BASE}handovers/`, {
+                    headers: getAuthHeaders()
+                });
+
+                if (response.status === 401) { handleLogout(); return; }
+                if (!response.ok) throw new Error("Błąd API: " + response.status);
+
+                const handovers = await response.json();
+                dataList.innerHTML = ''; // Czyścimy komunikat "Ładowanie..."
+
+                if (handovers.length === 0) {
+                    dataList.innerHTML = '<div style="padding: 20px; text-align: center;">Brak danych w bazie. Kliknij DODAJ, aby stworzyć pierwsze przekazanie.</div>';
+                    return;
+                }
+
+                handovers.forEach((item, index) => {
+                    const row = document.createElement('div');
+                    row.className = 'table-row';
+                    row.style.display = 'grid';
+                    row.style.gridTemplateColumns = gridLayout;
+                    row.style.gap = '10px';
+                    row.style.padding = '10px';
+                    row.style.borderBottom = '1px solid #eee';
+                    row.style.fontSize = '0.85em';
+
+                    row.innerHTML = `
+                        <div>${index + 1}.</div>
+                        <div>${item.imie || '-'}</div>
+                        <div style="font-weight: bold;">${item.nazwisko || '-'}</div>
+                        <div>${item.firma || '-'}</div>
+                        <div>${item.marka || '-'}</div>
+                        <div>${item.model || '-'}</div>
+                        <div>${item.rejestracja || '-'}</div>
+                        <div>${item.data_wydania}</div>
+                        <div>${item.data_zwrotu || 'W użytku'}</div>
+                        <div style="text-align: center;">${getActionButtons(item, 'handover')}</div>
+                    `;
+                    dataList.appendChild(row);
+                });
+            } catch (error) {
+                dataList.innerHTML = `<div style="color:red; padding:10px;">Błąd połączenia z serwerem. Upewnij się, że dodałeś widok w Django.</div>`;
+            }
+        }
+
+
         // Widok Szkód
         async function renderDamageEvents() {
             viewTitle.textContent = 'Zdarzenia Szkodowe i Awarie';
@@ -1161,7 +1291,7 @@
                             } else if (e.typ_zdarzenia.toLowerCase().includes('naprawa')) {
                                 type = 'repair';
                             } else {
-                                type = 'inspection'; // Badanie, Inspekcja, Legalizacja
+                                type = 'inspection'; // Badanie
                             }
                             events.push({
                                 date: e.data_serwisu,
@@ -1342,25 +1472,13 @@
 
         const viewMap = {
             'vehicles': renderVehicles,
-            'drivers': renderDrivers,        // Zmienione z renderPlaceholder
-            'damages': renderDamageEvents,   // Zmienione z renderPlaceholder
-
-            'inspection': () => renderServiceEvents('inspection'),
+            'drivers': renderDrivers,
+            'damages': renderDamageEvents,
+            'handover': renderHandovers,
             'calendar': renderCalendar,
-
             'policies': renderPolicies,
-            'tech_inspections': () => renderServiceEvents('tech_inspections'),
-            'reviews': () => renderServiceEvents('reviews'),
-            'repairs': () => renderServiceEvents('repairs'),
-            'legalization': () => renderServiceEvents('legalization'),
-
-            // Reszta może zostać jako placeholder, dopóki nie zrobimy dla nich modeli
-            'handover': renderPlaceholder,
-            'leasing': renderPlaceholder,
-            'hr_docs': renderPlaceholder,
-            'settlements': renderPlaceholder,
-            'other': renderPlaceholder,
-            'settings': renderPlaceholder,
+            'reviews': renderPlaceholder,
+            'repairs': renderPlaceholder,
         };
 
         function loadView(viewName) {
