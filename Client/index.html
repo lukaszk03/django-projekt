@@ -466,10 +466,13 @@
             let fieldsHtml = '';
 
             if (eventType === 'POLICY_OC') {
-                 // Pola dla Polisy
+                 // POPRAWKA: Dodano pole Ubezpieczyciel
                  fieldsHtml = `
                     <label for="numer_polisy_val">Numer Polisy:</label>
                     <input type="text" id="numer_polisy_val" required>
+
+                    <label for="ubezpieczyciel_val">Ubezpieczyciel:</label>
+                    <input type="text" id="ubezpieczyciel_val" placeholder="np. PZU, Warta" required>
 
                     <label for="data_waznosci_ac_val">Data Ważności AC (opcjonalnie):</label>
                     <input type="date" id="data_waznosci_ac_val">
@@ -722,6 +725,10 @@
                         data = {
                             pojazd: parseInt(pojazdId),
                             numer_polisy: document.getElementById('numer_polisy_val').value,
+
+                            // TO JEST NOWA LINIA - BEZ NIEJ BĘDZIE BŁĄD 400
+                            ubezpieczyciel: document.getElementById('ubezpieczyciel_val').value,
+
                             data_waznosci_oc: dataTerminu,
                             data_waznosci_ac: document.getElementById('data_waznosci_ac_val').value || null
                         };
