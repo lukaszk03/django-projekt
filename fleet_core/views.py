@@ -9,9 +9,11 @@ from django.contrib.auth import authenticate  # Do weryfikacji hasła
 from rest_framework_simplejwt.tokens import RefreshToken  # Do generowania tokenów
 
 # Usunięto błędny import 'User' - używamy tylko CustomUser z .models
-from .serializers import VehicleDto, DriverDto, DamageEventDto, InsurancePolicyDto, VehicleHandoverDto
-# Usunięto ServiceEvent z importów, aby nie powodował błędów
-from .models import Vehicle, Driver, DamageEvent, InsurancePolicy, CustomUser, VehicleHandover
+# DODANO: ServiceEventDto do listy importów
+from .serializers import VehicleDto, DriverDto, DamageEventDto, InsurancePolicyDto, VehicleHandoverDto, ServiceEventDto
+
+# DODANO: ServiceEvent do listy importów
+from .models import Vehicle, Driver, DamageEvent, InsurancePolicy, CustomUser, VehicleHandover, ServiceEvent
 
 # ----------------------------------------------------
 # WIDOKI DLA ZARZĄDZANIA DANYMI FLOTY (Fleet Data ViewSets)
@@ -28,7 +30,11 @@ class DriverViewSet(viewsets.ModelViewSet):
     queryset = Driver.objects.select_related('user').all()
     serializer_class = DriverDto
 
-# (Usunięto ServiceEventViewSet - Inspekcje, aby nie blokowały serwera)
+# 3. WIDOK DLA ZDARZEŃ SERWISOWYCH (Inspekcje, Naprawy, Przeglądy) - PRZYWRÓCONE
+class ServiceEventViewSet(viewsets.ModelViewSet):
+    # select_related('pojazd') jest konieczne, aby wyciągnąć VIN i Nr Rej. bez dodatkowych zapytań
+    queryset = ServiceEvent.objects.select_related('pojazd').all()
+    serializer_class = ServiceEventDto
 
 # 4. WIDOK DLA ZDARZEŃ SZKODOWYCH
 class DamageEventViewSet(viewsets.ModelViewSet):

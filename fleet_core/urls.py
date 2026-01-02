@@ -11,7 +11,8 @@ from .views import (
     InsurancePolicyViewSet,
     VehicleHandoverViewSet,
     login_view,
-    register_view
+    register_view,
+    ServiceEventViewSet
 )
 
 router = DefaultRouter()
@@ -19,7 +20,7 @@ router = DefaultRouter()
 # Rejestracja widoków w routerze
 router.register(r'vehicles', VehicleViewSet, basename='vehicle')
 router.register(r'drivers', DriverViewSet, basename='driver')
-# router.register(r'service_events'...) <- USUNIĘTE (Inspekcje)
+router.register(r'service_events', ServiceEventViewSet, basename='service_event')
 router.register(r'damage_events', DamageEventViewSet, basename='damage_event')
 router.register(r'handovers', VehicleHandoverViewSet, basename='handover')
 router.register(r'policies', InsurancePolicyViewSet, basename='policy')

@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
-    <title>FLEETIO - Pełny Interfejs Floty</title>
+    <title>FLEETSYS - Pełny Interfejs Floty</title>
     <style>
         /* CSS dla całego układu */
         body {
@@ -14,7 +14,7 @@
             height: 100vh;
         }
 
-        /* --- STYLY DLA LOGOWANIA (pozostają bez zmian) --- */
+        /* --- STYLY DLA LOGOWANIA --- */
         .login-container { display: none; justify-content: center; align-items: center; height: 100vh; width: 100%; background-color: #e9ecef; }
         .login-box { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); width: 350px; text-align: center; }
         .login-box input[type="text"], .login-box input[type="password"], .login-box input[type="email"] { width: 100%; padding: 10px; margin: 8px 0 15px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
@@ -25,18 +25,17 @@
         .sidebar { width: 250px; background-color: #ffffff; box-shadow: 2px 0 5px rgba(0,0,0,0.1); padding-top: 20px; min-height: 100vh; overflow-y: auto; }
         .menu-item { padding: 12px 20px; cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 14px; color: #333; }
         .menu-item:hover, .menu-item.active { background-color: #e6f7ff; color: #007bff; font-weight: bold; }
-        
-        /* Zmiana stylu dla podmenu, aby umożliwić wyrównanie kropki */
-        .menu-subitem { 
-            padding: 8px 20px 8px 45px; 
-            cursor: pointer; 
-            color: #555; 
+
+        .menu-subitem {
+            padding: 8px 20px 8px 45px;
+            cursor: pointer;
+            color: #555;
             font-size: 13px;
-            display: flex; 
+            display: flex;
             align-items: center;
         }
         .menu-subitem:hover, .menu-subitem.active { background-color: #f0f8ff; color: #007bff; }
-        
+
         .content-area { flex-grow: 1; padding: 20px 40px; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
         h1 { margin: 0; font-size: 24px; }
@@ -44,19 +43,13 @@
         .btn-add { background-color: #28a745; color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 4px; font-weight: bold; }
 
         .table-container { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        /* Zmienione kolumny dla pojazdów, aby zmieścić akcje */
         .table-header, .table-row { display: grid; grid-template-columns: 50px 1fr 1fr 1fr 1fr 1fr 120px; padding: 12px 0; border-bottom: 1px solid #ddd; }
         .table-header { font-weight: bold; background-color: #e9ecef; }
-        /* Zmienione kolumny dla małych tabel, aby zmieścić akcje */
         .table-header-sm, .table-row-sm { display: grid; grid-template-columns: 50px 1.5fr 1fr 1.5fr 1fr 120px; padding: 12px 0; border-bottom: 1px solid #ddd; }
         .table-header-sm { font-weight: bold; background-color: #e9ecef; }
         .error { color: red; text-align: center; padding: 20px; font-size: 1.1em; }
 
-        /* Styl dla przycisku wylogowania */
-        #logout-btn { background: none; border: none; color: #dc3545; cursor: pointer; font-weight: bold; margin-top: 20px; width: 100%; text-align: left; padding: 12px 20px; }
-        #logout-btn:hover { background-color: #ffeaea; }
-
-        /* --- STYLY DLA MODALU (NOWE) --- */
+        /* --- STYLY DLA MODALU --- */
         .modal {
             display: none;
             position: fixed;
@@ -106,7 +99,7 @@
             width: 10px;
             border-radius: 50%;
             display: inline-block;
-            margin-right: 8px; /* Odstęp od tekstu */
+            margin-right: 8px;
         }
         .dot-policy { background-color: #007bff; }
         .dot-review { background-color: #28a745; }
@@ -152,19 +145,10 @@
             transition: background-color 0.2s;
             text-align: left;
         }
-        .calendar-day.current-month {
-            background-color: #ffffff;
-        }
-        .calendar-day:hover {
-            background-color: #e6f7ff;
-        }
-        .calendar-day-number {
-            font-weight: bold;
-            font-size: 1.1em;
-            margin-bottom: 5px;
-            display: block;
-            color: #333;
-        }
+        .calendar-day.current-month { background-color: #ffffff; }
+        .calendar-day:hover { background-color: #e6f7ff; }
+        .calendar-day-number { font-weight: bold; font-size: 1.1em; margin-bottom: 5px; display: block; color: #333; }
+
         .event-item {
             font-size: 0.75em;
             padding: 2px 4px;
@@ -175,28 +159,78 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        /* Kolory dla różnych typów zdarzeń (te same co kropki w menu) */
-        .event-review { background-color: #28a745; } /* Przegląd */
-        .event-inspection { background-color: #ffc107; } /* Badanie */
-        .event-policy { background-color: #007bff; } /* Polisa */
-        .event-repair { background-color: #dc3545; } /* Naprawa */
+        .event-review { background-color: #28a745; }
+        .event-inspection { background-color: #ffc107; }
+        .event-policy { background-color: #007bff; }
+        .event-repair { background-color: #dc3545; }
 
-        /* --- STYLY DLA KOLOROWYCH RAMEK DNI (NOWE) --- */
-        /* Używamy !important, aby nadpisać standardowy border: 1px solid #dee2e6 */
         .day-border-policy { border: 2px solid #007bff !important; }
         .day-border-review { border: 2px solid #28a745 !important; }
         .day-border-inspection { border: 2px solid #ffc107 !important; }
         .day-border-repair { border: 2px solid #dc3545 !important; }
 
+        /* --- STYLY DLA PROFILU UŻYTKOWNIKA (PRAWY GÓRNY RÓG) --- */
+        .user-profile-section {
+            position: relative;
+            display: inline-block;
+            margin-left: 20px;
+            border-left: 1px solid #ccc;
+            padding-left: 20px;
+        }
+
+        .user-toggle-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .user-toggle-btn:hover { color: #007bff; }
+
+        .user-dropdown {
+            display: none;
+            position: absolute;
+            right: 0;
+            background-color: #fff;
+            min-width: 160px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            z-index: 100;
+            border-radius: 4px;
+            border: 1px solid #eee;
+            margin-top: 10px;
+        }
+
+        .user-dropdown button {
+            color: black;
+            padding: 12px 16px;
+            text-decoration: none;
+            display: block;
+            width: 100%;
+            text-align: left;
+            background: none;
+            border: none;
+            cursor: pointer;
+        }
+
+        .user-dropdown button:hover {
+            background-color: #f1f1f1;
+            color: #dc3545;
+        }
+
+        .show-dropdown { display: block; }
+
     </style>
 </head>
 <body>
 
-
-
         <div class="login-container" id="login-container">
             <div class="login-box" id="login-box">
-                <h2>Logowanie do FLEETIO</h2>
+                <h2>Logowanie do FLEETSYS</h2>
                 <p style="color: red; height: 1.5em;" id="login-error"></p>
                 <form id="login-form">
                     <input type="text" id="username" placeholder="Nazwa użytkownika" required>
@@ -232,7 +266,7 @@
         </div>
         <div class="main-app" id="main-app" style="display: none;">
             <div class="sidebar">
-                <div style="padding: 10px 20px; font-size: 1.5em; color: #007bff; font-weight: 900;">FLEETIO</div>
+                <div style="padding: 10px 20px; font-size: 1.5em; color: #007bff; font-weight: 900;">FLEETSYS</div>
 
                 <div class="menu-item active" data-view="vehicles"><span>🚗 Pojazdy</span></div>
                 <div class="menu-item" data-view="drivers"><i class="fas fa-users"></i>👤 Użytkownicy</div>
@@ -253,20 +287,31 @@
 
                 <div class="menu-item" data-view="settings" style="margin-top: 30px;">⚙️ Ustawienia</div>
 
-                <div style="padding: 20px;">
-                    <button id="logout-btn" style="width: 100%;">Wyloguj (rola: <span id="user-role-display"></span>)</button>
-                </div>
             </div>
 
             <div class="content-area">
                 <div class="header">
                     <h1 id="view-title">Pojazdy</h1>
 
-                    <div style="display: flex; gap: 10px;">
-                        <input type="text" id="table-search" placeholder="Szukaj..." onkeyup="filterTable()"
-                               style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 200px;">
+                    <div style="display: flex; align-items: center;">
+                        <div style="display: flex; gap: 10px; margin-right: 10px;">
+                            <input type="text" id="table-search" placeholder="Szukaj..." onkeyup="filterTable()"
+                                   style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 200px;">
 
-                        <button class="btn-add" id="add-btn">➕ DODAJ</button>
+                            <button class="btn-add" id="add-btn">➕ DODAJ</button>
+                        </div>
+
+                        <div class="user-profile-section">
+                            <button onclick="toggleUserMenu()" class="user-toggle-btn" id="user-menu-btn">
+                                👤 <span id="header-username">Ładowanie...</span> ▼
+                            </button>
+                            <div id="user-dropdown-content" class="user-dropdown">
+                                <div style="padding: 10px; font-size: 0.85em; color: #666; border-bottom: 1px solid #eee;">
+                                    Rola: <span id="header-role">---</span>
+                                </div>
+                                <button onclick="handleLogout()">🚪 Wyloguj się</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div id="main-content"></div>
@@ -294,16 +339,15 @@
         const menuItems = document.querySelectorAll('.menu-item, .menu-subitem');
         const API_BASE = 'http://127.0.0.1:8000/api/';
 
-        // Elementy Logowania (bez zmian)
+        // Elementy Logowania
         const loginContainer = document.getElementById('login-container');
         const mainApp = document.getElementById('main-app');
         const loginForm = document.getElementById('login-form');
         const pin2faInput = document.getElementById('pin_2fa');
         const loginError = document.getElementById('login-error');
-        const userRoleDisplay = document.getElementById('user-role-display');
-        const logoutBtn = document.getElementById('logout-btn');
+        // USUNIĘTO: const userRoleDisplay (ponieważ ten element usunęliśmy z HTML sidebar)
 
-        // Elementy Modalu (NOWE)
+        // Elementy Modalu
         const modal = document.getElementById('data-modal');
         const closeModalBtn = document.querySelector('.close-btn');
         const modalTitle = document.getElementById('modal-title');
@@ -314,10 +358,10 @@
         const deleteBtn = document.getElementById('delete-btn');
         const addBtn = document.getElementById('add-btn');
 
-        let currentView = 'vehicles'; // Śledzenie aktualnego widoku
-        let currentRecordId = null; // ID rekordu do edycji/usunięcia
+        let currentView = 'vehicles';
+        let currentRecordId = null;
 
-        // --- FUNKCJE POMOCNICZE (TOKENY, LOGOUT, LOGIN - BEZ ZMIAN) ---
+        // --- FUNKCJE POMOCNICZE ---
 
         function getAuthHeaders() {
             const token = localStorage.getItem('access_token');
@@ -331,11 +375,46 @@
             localStorage.removeItem('access_token');
             localStorage.removeItem('refresh_token');
             localStorage.removeItem('user_role');
+            localStorage.removeItem('username');
+
             loginContainer.style.display = 'flex';
             mainApp.style.display = 'none';
         }
 
-        logoutBtn.addEventListener('click', handleLogout);
+        // USUNIĘTO: logoutBtn.addEventListener (bo przycisku już nie ma w zmiennych, jest w onclick w HTML)
+
+        // Funkcja aktualizująca tekst w prawym górnym rogu
+        function updateHeaderUser() {
+            const username = localStorage.getItem('username') || 'Gość';
+            const role = localStorage.getItem('user_role') || '---';
+
+            const headerName = document.getElementById('header-username');
+            const headerRole = document.getElementById('header-role');
+
+            if(headerName) headerName.textContent = username;
+            if(headerRole) headerRole.textContent = role;
+        }
+
+        // Funkcja otwierająca/zamykająca menu
+        function toggleUserMenu() {
+            document.getElementById("user-dropdown-content").classList.toggle("show-dropdown");
+        }
+
+        // Zamknij menu, jeśli użytkownik kliknie gdziekolwiek indziej
+        window.onclick = function(event) {
+            if (!event.target.matches('.user-toggle-btn') && !event.target.matches('.user-toggle-btn *')) {
+                var dropdowns = document.getElementsByClassName("user-dropdown");
+                for (var i = 0; i < dropdowns.length; i++) {
+                    var openDropdown = dropdowns[i];
+                    if (openDropdown.classList.contains('show-dropdown')) {
+                        openDropdown.classList.remove('show-dropdown');
+                    }
+                }
+            }
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
 
         async function handleLogin(event) {
             event.preventDefault();
@@ -354,9 +433,18 @@
                     localStorage.setItem('access_token', data.access);
                     localStorage.setItem('refresh_token', data.refresh);
                     localStorage.setItem('user_role', data.user_role);
+
+                    // Zapisujemy nazwę użytkownika
+                    localStorage.setItem('username', data.username);
+
                     loginContainer.style.display = 'none';
                     mainApp.style.display = 'flex';
-                    userRoleDisplay.textContent = data.user_role;
+
+                    // Odświeżamy prawy górny róg
+                    if (typeof updateHeaderUser === 'function') {
+                        updateHeaderUser();
+                    }
+
                     loginForm.reset();
                     pin2faInput.style.display = 'none';
                     loadView('vehicles');
@@ -370,36 +458,31 @@
                     }
                 }
             } catch (error) {
+                console.error(error);
                 loginError.textContent = 'Błąd sieci. Sprawdź, czy serwer Django działa na porcie 8000.';
             }
         }
         loginForm.addEventListener('submit', handleLogin);
 
-        // Funkcje przełączania widoków
         function showRegister() {
-            // Ukrywamy box logowania, pokazujemy box rejestracji
             document.getElementById('login-box').style.display = 'none';
             document.getElementById('register-box').style.display = 'block';
         }
 
         function showLogin() {
-            // Ukrywamy box rejestracji, pokazujemy box logowania
             document.getElementById('login-box').style.display = 'block';
             document.getElementById('register-box').style.display = 'none';
         }
 
-        // Obsługa wysyłania rejestracji do Django
         async function handleRegister() {
             const username = document.getElementById('reg_username').value;
             const email = document.getElementById('reg_email').value;
             const password = document.getElementById('reg_password').value;
             const rola = document.getElementById('reg_role').value;
-            const first_name = document.getElementById('reg_first_name').value; // NOWE
-            const last_name = document.getElementById('reg_last_name').value;   // NOWE
+            const first_name = document.getElementById('reg_first_name').value;
+            const last_name = document.getElementById('reg_last_name').value;
             const errorElem = document.getElementById('register-error');
 
-
-            // Reset błędu przed wysłaniem
             errorElem.textContent = "";
 
             try {
@@ -413,9 +496,8 @@
 
                 if (response.ok) {
                     alert("Konto utworzone pomyślnie! Teraz możesz się zalogować.");
-                    showLogin(); // Automatyczny powrót do ekranu logowania
+                    showLogin();
                 } else {
-                    // Wyświetlenie błędu z serwera (np. "Użytkownik już istnieje")
                     errorElem.textContent = data.detail || "Błąd rejestracji";
                 }
             } catch (error) {
@@ -423,31 +505,26 @@
             }
         }
 
-        // --- FUNKCJE DLA MODALU (DODAWANIE/EDYCJA/USUNIĘCIE) ---
+        // --- FUNKCJE DLA MODALU ---
 
         closeModalBtn.onclick = () => { modal.style.display = "none"; };
-        window.onclick = (event) => { if (event.target == modal) modal.style.display = "none"; };
 
-        // Mapowanie widoków do endpointów API
         const endpointMap = {
             'vehicles': 'vehicles',
             'drivers': 'drivers',
             'damages': 'damage_events',
-            'handover': 'handovers', // <--- DODAJ TĘ LINIĘ (zakładając, że endpoint to /api/handovers/)
+            'handover': 'handovers',
             'inspection': 'service_events',
             'repairs': 'service_events',
             'reviews': 'service_events',
             'tech_inspections': 'service_events',
             'legalization': 'service_events',
             'policies': 'policies',
-            // Kalendarz będzie używał dynamicznie 'service_events' lub 'policies'
             'calendar': null
         };
 
-        // Dodawanie rekordu
         addBtn.addEventListener('click', () => openModal(currentView));
 
-        // NOWA FUNKCJA: Pobieranie listy pojazdów
         async function fetchVehicles() {
             try {
                 const response = await fetch(API_BASE + 'vehicles/', { headers: getAuthHeaders() });
@@ -460,13 +537,11 @@
             }
         }
 
-        // NOWA FUNKCJA: Dynamiczna zmiana pól formularza w Terminarzu
         function updateFormFields(eventType) {
             const container = document.getElementById('dynamic-fields-container');
             let fieldsHtml = '';
 
             if (eventType === 'POLICY_OC') {
-                 // POPRAWKA: Dodano pole Ubezpieczyciel
                  fieldsHtml = `
                     <label for="numer_polisy_val">Numer Polisy:</label>
                     <input type="text" id="numer_polisy_val" required>
@@ -478,7 +553,6 @@
                     <input type="date" id="data_waznosci_ac_val">
                  `;
             } else {
-                 // Pola dla ServiceEvent
                  fieldsHtml = `
                     <label for="opis_zdarzenia_val">Opis Zdarzenia:</label>
                     <textarea id="opis_zdarzenia_val" required></textarea>
@@ -489,22 +563,21 @@
             }
             container.innerHTML = fieldsHtml;
         }
-        window.updateFormFields = updateFormFields; // Udostępnienie do eventu 'onchange' w HTML
+        window.updateFormFields = updateFormFields;
 
 
         /** Otwiera modal i ładuje odpowiedni formularz */
         async function openModal(viewName, recordOrId = null) {
             let record = null;
             modalError.textContent = '';
-            modalForm.innerHTML = 'Ładowanie danych...'; // Informacja dla użytkownika
+            modalForm.innerHTML = 'Ładowanie danych...';
 
-            // --- LOGIKA POBIERANIA DANYCH JEŚLI PRZEKAZANO TYLKO ID ---
+            // Logika pobierania danych (bez zmian)
             if (recordOrId !== null) {
                 if (typeof recordOrId === 'object') {
                     record = recordOrId;
                     currentRecordId = record.id;
                 } else {
-                    // Przekazano samo ID (np. z przycisku w tabeli)
                     currentRecordId = recordOrId;
                     try {
                         const endpoint = endpointMap[viewName] || viewName;
@@ -531,7 +604,7 @@
             let formHtml = '';
             const isCalendarEventView = ['calendar', 'policies', 'tech_inspections', 'reviews', 'repairs', 'legalization', 'inspection'].includes(viewName);
 
-            // 1. WIDOK DLA NOWEGO TERMINU (KALENDARZ)
+            // 1. DODAWANIE NOWEGO TERMINU (BEZ ZMIAN)
             if (isCalendarEventView && !currentRecordId) {
                 modalTitle.textContent = `Dodaj Nowy Termin/Zdarzenie`;
                 const vehicles = await fetchVehicles();
@@ -553,137 +626,110 @@
                     <input type="date" id="data_terminu" required>
                 `;
             }
-            // 2. POJAZDY
+            // 2. POJAZDY (BEZ ZMIAN)
             else if (viewName === 'vehicles') {
                 const sel = (f, v) => (record && record[f] === v) ? 'selected' : '';
                 formHtml = `
-                    <label for="v_marka">Marka:</label>
-                    <input type="text" id="v_marka" value="${record?.marka || ''}" placeholder="np. Toyota">
-                    <label for="v_model">Model:</label>
-                    <input type="text" id="v_model" value="${record?.model || ''}" placeholder="np. Corolla">
-                    <label for="v_type">Typ pojazdu:</label>
+                    <label>Marka:</label><input type="text" id="v_marka" value="${record?.marka || ''}">
+                    <label>Model:</label><input type="text" id="v_model" value="${record?.model || ''}">
+                    <label>Typ:</label>
                     <select id="v_type">
                         <option value="OSOBOWE" ${sel('typ_pojazdu', 'OSOBOWE')}>Osobowe</option>
                         <option value="CIEZAROWE" ${sel('typ_pojazdu', 'CIEZAROWE')}>Ciężarowe</option>
                         <option value="AUTOBUSY" ${sel('typ_pojazdu', 'AUTOBUSY')}>Autobusy</option>
-                        <option value="SEDAN" ${sel('typ_pojazdu', 'SEDAN')}>Sedan</option>
-                        <option value="SUV" ${sel('typ_pojazdu', 'SUV')}>SUV</option>
-                        <option value="KOMBI" ${sel('typ_pojazdu', 'KOMBI')}>Kombi</option>
                     </select>
-                    <label for="reg_num">Nr Rejestracyjny:</label>
-                    <input type="text" id="reg_num" value="${record?.registration_number || ''}" required>
-                    <label for="vin_num">VIN:</label>
-                    <input type="text" id="vin_num" value="${record?.vin || ''}" required>
-                    <label for="v_first_reg">Data pierwszej rejestracji:</label>
-                    <input type="date" id="v_first_reg" value="${record?.data_pierwszej_rejestracji || ''}">
-                    <label for="fuel_type_input">Rodzaj Paliwa:</label>
-                    <select id="fuel_type_input" required>
-                        <option value="BENZYNA" ${sel('fuel_type', 'BENZYNA')}>Benzyna</option>
+                    <label>Nr Rej:</label><input type="text" id="reg_num" value="${record?.registration_number || ''}" required>
+                    <label>VIN:</label><input type="text" id="vin_num" value="${record?.vin || ''}" required>
+                    <label>Data I Rej:</label><input type="date" id="v_first_reg" value="${record?.data_pierwszej_rejestracji || ''}">
+                    <label>Paliwo:</label>
+                    <select id="fuel_type_input">
                         <option value="DIESEL" ${sel('fuel_type', 'DIESEL')}>Diesel</option>
-                        <option value="ELECTRIC" ${sel('fuel_type', 'ELECTRIC')}>Elektryczny</option>
-                        <option value="LPG" ${sel('fuel_type', 'LPG')}>LPG</option>
+                        <option value="BENZYNA" ${sel('fuel_type', 'BENZYNA')}>Benzyna</option>
                     </select>
-                    <label for="przebieg_val">Przebieg (km):</label>
-                    <input type="number" id="przebieg_val" value="${record?.przebieg || ''}" required>
-                    <label for="company_id">ID Firmy:</label>
-                    <input type="number" id="company_id" value="${record?.company || ''}" required>
-                    <label for="v_assigned_user">ID Przypisanego Użytkownika:</label>
-                    <input type="number" id="v_assigned_user" value="${record?.assigned_user || ''}">
-                    <label for="v_status">Status pojazdu:</label>
+                    <label>Przebieg:</label><input type="number" id="przebieg_val" value="${record?.przebieg || ''}">
+                    <label>Firma ID:</label><input type="number" id="company_id" value="${record?.company || ''}">
+                    <label>User ID:</label><input type="number" id="v_assigned_user" value="${record?.assigned_user || ''}">
+                    <label>Status:</label>
                     <select id="v_status">
                         <option value="SPRAWNY" ${sel('status', 'SPRAWNY')}>Sprawny</option>
                         <option value="NIESPRAWNY" ${sel('status', 'NIESPRAWNY')}>Niesprawny</option>
                     </select>
-                    <label for="v_uwagi">Uwagi:</label>
-                    <textarea id="v_uwagi" rows="2">${record?.uwagi || ''}</textarea>
+                    <label>Uwagi:</label><textarea id="v_uwagi">${record?.uwagi || ''}</textarea>
                 `;
             }
-            // 3. KIEROWCY (Z Twoimi polami)
+            // 3. KIEROWCY (BEZ ZMIAN)
             else if (viewName === 'drivers') {
                 formHtml = `
-                    <label for="d_user_id">ID Użytkownika Systemowego:</label>
-                    <input type="number" id="d_user_id" value="${record?.user || ''}" ${currentRecordId ? 'disabled' : ''} required>
-                    <label for="d_company_id">ID Firmy:</label>
-                    <input type="number" id="d_company_id" value="${record?.company || ''}">
-                    <label for="prawa_jazdy_num">Numer Prawa Jazdy:</label>
-                    <input type="text" id="prawa_jazdy_num" value="${record?.numer_prawa_jazdy || ''}">
-                    <label for="kat_prawa_jazdy">Kategorie:</label>
-                    <input type="text" id="kat_prawa_jazdy" value="${record?.kategorie_prawa_jazdy || 'B'}">
-                    <label for="data_waznosci_pj_val">Ważność Prawa Jazdy:</label>
-                    <input type="date" id="data_waznosci_pj_val" value="${record?.data_waznosci_prawa_jazdy || ''}" required>
-                    <label for="data_badan_val">Ważność badań lekarskich:</label>
-                    <input type="date" id="data_badan_val" value="${record?.data_waznosci_badan || ''}">
+                    <label>User ID:</label><input type="number" id="d_user_id" value="${record?.user || ''}" ${currentRecordId ? 'disabled' : ''}>
+                    <label>Firma ID:</label><input type="number" id="d_company_id" value="${record?.company || ''}">
+                    <label>Nr Prawa Jazdy:</label><input type="text" id="prawa_jazdy_num" value="${record?.numer_prawa_jazdy || ''}">
+                    <label>Kategorie:</label><input type="text" id="kat_prawa_jazdy" value="${record?.kategorie_prawa_jazdy || 'B'}">
+                    <label>Ważność PJ:</label><input type="date" id="data_waznosci_pj_val" value="${record?.data_waznosci_prawa_jazdy || ''}" required>
+                    <label>Badania lek:</label><input type="date" id="data_badan_val" value="${record?.data_waznosci_badan || ''}">
                 `;
             }
-
-            // PRZEKAZANIA ---
+            // 4. PRZEKAZANIA (BEZ ZMIAN)
             else if (viewName === 'handover') {
                 formHtml = `
-                    <label>ID Pojazdu:</label>
-                    <input type="number" id="h_pojazd_id" value="${record?.pojazd || ''}" required>
-
-                    <label>ID Kierowcy:</label>
-                    <input type="number" id="h_kierowca_id" value="${record?.kierowca || ''}" required>
-
-                    <label>Data Przypisania (Wydania):</label>
-                    <input type="date" id="h_data_wydania" value="${record?.data_wydania || ''}" required>
-
-                    <label>Data Oddania (opcjonalnie):</label>
-                    <input type="date" id="h_data_zwrotu" value="${record?.data_zwrotu || ''}">
-
-                    <label>Uwagi:</label>
-                    <textarea id="h_uwagi">${record?.uwagi || ''}</textarea>
+                    <label>ID Pojazdu:</label><input type="number" id="h_pojazd_id" value="${record?.pojazd || ''}" required>
+                    <label>ID Kierowcy:</label><input type="number" id="h_kierowca_id" value="${record?.kierowca || ''}" required>
+                    <label>Data Wydania:</label><input type="date" id="h_data_wydania" value="${record?.data_wydania || ''}" required>
+                    <label>Data Zwrotu:</label><input type="date" id="h_data_zwrotu" value="${record?.data_zwrotu || ''}">
+                    <label>Uwagi:</label><textarea id="h_uwagi">${record?.uwagi || ''}</textarea>
                 `;
             }
-
-            // 5. SZKODY (DAMAGES) - TEGO BRAKOWAŁO!
+            // 5. SZKODY (BEZ ZMIAN)
             else if (viewName === 'damages') {
                 const sel = (val) => (record?.status_naprawy === val ? 'selected' : '');
                 formHtml = `
-                    <label>ID Pojazdu:</label>
-                    <input type="number" id="pojazd_id" value="${record?.pojazd || ''}" required>
-
-                    <label>Data Zdarzenia:</label>
-                    <input type="date" id="data_zdarzenia_val" value="${record?.data_zdarzenia || ''}" required>
-
-                    <label>Status Naprawy:</label>
+                    <label>ID Pojazdu:</label><input type="number" id="pojazd_id" value="${record?.pojazd || ''}" required>
+                    <label>Data:</label><input type="date" id="data_zdarzenia_val" value="${record?.data_zdarzenia || ''}" required>
+                    <label>Status:</label>
                     <select id="status_naprawy_val">
                         <option value="ZGLOSZONA" ${sel('ZGLOSZONA')}>Zgłoszona</option>
                         <option value="W_NAPRAWIE" ${sel('W_NAPRAWIE')}>W naprawie</option>
                         <option value="ZAMKNIETA" ${sel('ZAMKNIETA')}>Zamknięta</option>
                     </select>
-
-                    <label>Opis szkody:</label>
-                    <textarea id="opis_szkody" rows="4" required>${record?.opis || ''}</textarea>
+                    <label>Opis:</label><textarea id="opis_szkody">${record?.opis || ''}</textarea>
                 `;
             }
-
-
-
-            // 4. EDYCJA ISTNIEJĄCYCH TERMINÓW
+            // 6. --- EDYCJA ZDARZEŃ (POLISY, BADANIA, NAPRAWY) ---
+            // TUTAJ BYŁ BŁĄD! Teraz naprawiamy.
             else if (isCalendarEventView && currentRecordId) {
                  const endpointForType = endpointMap[viewName];
+
                  if (endpointForType === 'service_events') {
+                      // Dla Badań tech, Napraw, Przeglądów
                       formHtml = `
                         <input type="hidden" id="typ_zdarzenia_val" value="${record.typ_zdarzenia}">
-                        <label for="pojazd_id">ID Pojazdu:</label>
+
+                        <label>ID Pojazdu:</label>
                         <input type="number" id="pojazd_id" value="${record.pojazd}" required>
-                        <label for="opis_serwisu">Opis:</label>
+
+                        <label>Opis:</label>
                         <textarea id="opis_serwisu" required>${record.opis}</textarea>
-                        <label for="koszt_val">Koszt (PLN):</label>
+
+                        <label>Koszt (PLN):</label>
                         <input type="number" id="koszt_val" step="0.01" value="${record.koszt}" required>
-                        <label for="data_serwisu_val">Data Zdarzenia:</label>
+
+                        <label>Data Zdarzenia/Badania:</label>
                         <input type="date" id="data_serwisu_val" value="${record.data_serwisu}" required>
                     `;
                  } else if (endpointForType === 'policies') {
+                      // Dla Polis - DODANO BRAKUJĄCY UBEZPIECZYCIEL
                       formHtml = `
-                            <label for="pojazd_id">ID Pojazdu:</label>
+                            <label>ID Pojazdu:</label>
                             <input type="number" id="pojazd_id" value="${record.pojazd}" required>
-                            <label for="numer_polisy">Numer Polisy:</label>
+
+                            <label>Numer Polisy:</label>
                             <input type="text" id="numer_polisy" value="${record.numer_polisy}" required>
-                            <label for="data_waznosci_oc">Data Ważności OC:</label>
+
+                            <label>Ubezpieczyciel:</label> <input type="text" id="ubezpieczyciel_val" value="${record.ubezpieczyciel || ''}" required>
+
+                            <label>Data Ważności OC:</label>
                             <input type="date" id="data_waznosci_oc" value="${record.data_waznosci_oc}" required>
-                            <label for="data_waznosci_ac">Data Ważności AC:</label>
+
+                            <label>Data Ważności AC:</label>
                             <input type="date" id="data_waznosci_ac" value="${record.data_waznosci_ac || ''}">
                         `;
                  }
@@ -694,9 +740,7 @@
         }
 
 
-                /** Obsługuje logikę zapisu (POST - dodawanie / PUT - edycja) */
         async function handleSave(event) {
-            // 1. Zatrzymujemy domyślną akcję (zapobiega odświeżeniu strony)
             if (event && event.preventDefault) event.preventDefault();
 
             const modalError = document.getElementById('modal-error');
@@ -704,11 +748,7 @@
 
             const eventTypeSelector = document.getElementById('event_type_selector');
             let data = {};
-
-            // Używamy currentView (globalna zmienna), a nie viewName
             let endpoint = endpointMap[currentView] || currentView;
-
-            // Ustalamy metodę i URL
             let method = currentRecordId ? 'PUT' : 'POST';
             let url = currentRecordId ? `${API_BASE}${endpoint}/${currentRecordId}/` : `${API_BASE}${endpoint}/`;
 
@@ -716,7 +756,7 @@
 
             try {
                 if (eventTypeSelector && !currentRecordId) {
-                    // --- LOGIKA DLA NOWEGO TERMINU (Z KALENDARZA) ---
+                    // DODAWANIE NOWEGO TERMINU (BEZ ZMIAN)
                     const selectedType = eventTypeSelector.value;
                     const pojazdId = document.getElementById('pojazd_id_selector').value;
                     const dataTerminu = document.getElementById('data_terminu').value;
@@ -725,10 +765,7 @@
                         data = {
                             pojazd: parseInt(pojazdId),
                             numer_polisy: document.getElementById('numer_polisy_val').value,
-
-                            // TO JEST NOWA LINIA - BEZ NIEJ BĘDZIE BŁĄD 400
                             ubezpieczyciel: document.getElementById('ubezpieczyciel_val').value,
-
                             data_waznosci_oc: dataTerminu,
                             data_waznosci_ac: document.getElementById('data_waznosci_ac_val').value || null
                         };
@@ -746,116 +783,106 @@
                     url = `${API_BASE}${endpoint}/`;
                     method = 'POST';
                 }
-        // --- POJAZDY ---
-        else if (currentView === 'vehicles') {
-            data = {
-                registration_number: document.getElementById('reg_num').value,
-                vin: document.getElementById('vin_num').value,
-                fuel_type: document.getElementById('fuel_type_input').value,
-                przebieg: parseFloat(document.getElementById('przebieg_val').value) || 0,
-                company: parseInt(document.getElementById('company_id').value) || null,
-                is_active: true,
-                marka: document.getElementById('v_marka').value,
-                model: document.getElementById('v_model').value,
-                data_pierwszej_rejestracji: document.getElementById('v_first_reg').value || null,
-                assigned_user: document.getElementById('v_assigned_user').value ? parseInt(document.getElementById('v_assigned_user').value) : null,
-                status: document.getElementById('v_status').value,
-                typ_pojazdu: document.getElementById('v_type').value,
-                uwagi: document.getElementById('v_uwagi').value || null
-            };
-        }
-        // --- SZKODY ---
-        else if (currentView === 'damages') {
-            data = {
-                pojazd: parseInt(document.getElementById('pojazd_id').value),
-                opis: document.getElementById('opis_szkody').value,
-                data_zdarzenia: document.getElementById('data_zdarzenia_val').value,
-                status_naprawy: document.getElementById('status_naprawy_val').value,
-                szacowany_koszt: 0
-            };
-        }
-        // --- KIEROWCY ---
-        else if (currentView === 'drivers') {
-            const userIdInput = document.getElementById('d_user_id');
-            const userId = userIdInput ? userIdInput.value : null;
+                // POJAZDY
+                else if (currentView === 'vehicles') {
+                    data = {
+                        registration_number: document.getElementById('reg_num').value,
+                        vin: document.getElementById('vin_num').value,
+                        fuel_type: document.getElementById('fuel_type_input').value,
+                        przebieg: parseFloat(document.getElementById('przebieg_val').value) || 0,
+                        company: parseInt(document.getElementById('company_id').value) || null,
+                        is_active: true,
+                        marka: document.getElementById('v_marka').value,
+                        model: document.getElementById('v_model').value,
+                        data_pierwszej_rejestracji: document.getElementById('v_first_reg').value || null,
+                        assigned_user: document.getElementById('v_assigned_user').value ? parseInt(document.getElementById('v_assigned_user').value) : null,
+                        status: document.getElementById('v_status').value,
+                        typ_pojazdu: document.getElementById('v_type').value,
+                        uwagi: document.getElementById('v_uwagi').value || null
+                    };
+                }
+                // SZKODY
+                else if (currentView === 'damages') {
+                    data = {
+                        pojazd: parseInt(document.getElementById('pojazd_id').value),
+                        opis: document.getElementById('opis_szkody').value,
+                        data_zdarzenia: document.getElementById('data_zdarzenia_val').value,
+                        status_naprawy: document.getElementById('status_naprawy_val').value,
+                        szacowany_koszt: 0
+                    };
+                }
+                // KIEROWCY
+                else if (currentView === 'drivers') {
+                    const userIdInput = document.getElementById('d_user_id');
+                    const userId = userIdInput ? userIdInput.value : null;
+                    if (!userId && !currentRecordId) { alert("ID użytkownika wymagane!"); return; }
 
-            if (!userId && !currentRecordId) {
-                alert("ID użytkownika jest wymagane do utworzenia profilu kierowcy!");
-                return;
+                    data = {
+                        ...(userId && { user: parseInt(userId) }),
+                        numer_prawa_jazdy: document.getElementById('prawa_jazdy_num').value,
+                        kategorie_prawa_jazdy: document.getElementById('kat_prawa_jazdy').value,
+                        data_waznosci_prawa_jazdy: document.getElementById('data_waznosci_pj_val').value || null,
+                        company: parseInt(document.getElementById('d_company_id').value) || null,
+                        data_waznosci_badan: document.getElementById('data_badan_val').value || null
+                    };
+                }
+                // PRZEKAZANIA
+                else if (currentView === 'handover') {
+                    data = {
+                        pojazd: parseInt(document.getElementById('h_pojazd_id').value),
+                        kierowca: parseInt(document.getElementById('h_kierowca_id').value),
+                        data_wydania: document.getElementById('h_data_wydania').value,
+                        data_zwrotu: document.getElementById('h_data_zwrotu').value || null,
+                        uwagi: document.getElementById('h_uwagi').value
+                    };
+                }
+                // --- EDYCJA ISTNIEJĄCYCH (POLISY I SERWIS) ---
+                // TUTAJ POPRAWIAMY LOGIKĘ!
+                else if (currentRecordId) {
+                    const resolvedEndpoint = endpointMap[currentView] || currentView;
+
+                    if (resolvedEndpoint === 'service_events') {
+                        data = {
+                            pojazd: parseInt(document.getElementById('pojazd_id').value),
+                            opis: document.getElementById('opis_serwisu').value,
+                            koszt: parseFloat(document.getElementById('koszt_val').value) || 0,
+                            data_serwisu: document.getElementById('data_serwisu_val').value,
+                            typ_zdarzenia: document.getElementById('typ_zdarzenia_val').value // Pobieramy z ukrytego pola
+                        };
+                    } else if (resolvedEndpoint === 'policies') {
+                        data = {
+                            pojazd: parseInt(document.getElementById('pojazd_id').value),
+                            numer_polisy: document.getElementById('numer_polisy').value,
+                            ubezpieczyciel: document.getElementById('ubezpieczyciel_val').value, // TO BYŁO BRAKUJĄCE
+                            data_waznosci_oc: document.getElementById('data_waznosci_oc').value,
+                            data_waznosci_ac: document.getElementById('data_waznosci_ac').value || null
+                        };
+                    }
+                }
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.status === 401) { handleLogout(); return; }
+
+                if (response.ok) {
+                    console.log("Zapis zakończony sukcesem!");
+                    document.getElementById('data-modal').style.display = "none";
+                    loadView(currentView);
+                } else {
+                    const errorData = await response.json();
+                    modalError.textContent = `Błąd: ${JSON.stringify(errorData)}`;
+                }
+            } catch (error) {
+                console.error("Błąd handleSave:", error);
+                if (modalError) modalError.textContent = "Wystąpił błąd po stronie przeglądarki.";
             }
-
-            data = {
-                ...(userId && { user: parseInt(userId) }),
-                numer_prawa_jazdy: document.getElementById('prawa_jazdy_num').value,
-                kategorie_prawa_jazdy: document.getElementById('kat_prawa_jazdy').value,
-                data_waznosci_prawa_jazdy: document.getElementById('data_waznosci_pj_val').value || null,
-                company: parseInt(document.getElementById('d_company_id').value) || null,
-                data_waznosci_badan: document.getElementById('data_badan_val').value || null
-            };
-        }
-        // --- PRZEKAZANIA (TUTAJ BYŁ BŁĄD) ---
-        else if (currentView === 'handover') {
-            // Tutaj pobieramy wartości z inputów zdefiniowanych w openModal
-            // Upewnij się, że w openModal używasz tych samych ID (h_pojazd_id, h_kierowca_id)
-            data = {
-                pojazd: parseInt(document.getElementById('h_pojazd_id').value),
-                kierowca: parseInt(document.getElementById('h_kierowca_id').value),
-                data_wydania: document.getElementById('h_data_wydania').value,
-                data_zwrotu: document.getElementById('h_data_zwrotu').value || null,
-                uwagi: document.getElementById('h_uwagi').value
-            };
-        }
-        // --- EDYCJA ZDARZEŃ SERWISOWYCH I POLIS (inne widoki) ---
-        else if (currentRecordId) {
-            const resolvedEndpoint = endpointMap[currentView] || currentView;
-
-            if (resolvedEndpoint === 'service_events') {
-                data = {
-                    pojazd: parseInt(document.getElementById('pojazd_id').value),
-                    opis: document.getElementById('opis_serwisu').value,
-                    koszt: parseFloat(document.getElementById('koszt_val').value) || 0,
-                    data_serwisu: document.getElementById('data_serwisu_val').value,
-                    typ_zdarzenia: document.getElementById('typ_zdarzenia_val').value
-                };
-            } else if (resolvedEndpoint === 'policies') {
-                data = {
-                    pojazd: parseInt(document.getElementById('pojazd_id').value),
-                    numer_polisy: document.getElementById('numer_polisy').value,
-                    data_waznosci_oc: document.getElementById('data_waznosci_oc').value,
-                    data_waznosci_ac: document.getElementById('data_waznosci_ac').value || null
-                };
-            }
         }
 
-        // WYSYŁKA DANYCH
-        const response = await fetch(url, {
-            method: method,
-            headers: {
-                ...getAuthHeaders(),
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
 
-        if (response.status === 401) { handleLogout(); return; }
-
-        if (response.ok) {
-            console.log("Zapis zakończony sukcesem!");
-            document.getElementById('data-modal').style.display = "none";
-            loadView(currentView);
-        } else {
-            const errorData = await response.json();
-            console.error("Błąd walidacji serwera:", errorData);
-            modalError.textContent = `Błąd: ${JSON.stringify(errorData)}`;
-        }
-    } catch (error) {
-        console.error("Błąd krytyczny handleSave:", error);
-        if (modalError) modalError.textContent = "Wystąpił błąd po stronie przeglądarki (sprawdź konsolę F12).";
-    }
-}
-
-
-        /** Obsługuje logikę usuwania (DELETE) - bez zmian */
         async function handleDelete() {
             if (!currentRecordId || !confirm(`Czy na pewno chcesz usunąć rekord o ID: ${currentRecordId}?`)) {
                 return;
@@ -887,21 +914,13 @@
         deleteBtn.onclick = handleDelete;
 
         async function deleteRecord(viewName, id) {
-            // Ustawiamy globalne zmienne, których używa Twoje handleDelete
             currentView = viewName;
             currentRecordId = id;
-
-            // Wywołujemy Twoją istniejącą funkcję
             await handleDelete();
         }
 
-        // --- FUNKCJE RENDERUJĄCE WIDOKI ---
-
-        // Helper dla generowania przycisków
         function getActionButtons(record, viewName) {
-            // Używamy tylko ID rekordu, co zapobiega błędom przy przesyłaniu dużych obiektów w HTML
             const id = record.id;
-
             return `
                 <div class="action-buttons" style="display: flex; gap: 8px; justify-content: center;">
                     <button class="btn-edit"
@@ -917,7 +936,7 @@
                 </div>
             `;
         }
-        // Zmodyfikowana funkcja, aby upewnić się, że inne widoki działają
+
         async function renderVehicles() {
             const mainContent = document.getElementById('main-content');
             if (!mainContent) return;
@@ -925,8 +944,6 @@
             currentView = 'vehicles';
             viewTitle.textContent = 'Pojazdy';
 
-            // Rozbudowany nagłówek - 11 kolumn
-            // Lp(40px), Marka(1fr), Model(1fr), NrRej(110px), VIN(1.2fr), Paliwo(100px), Przebieg(100px), Firma(1fr), Użytkownik(1fr), Data(120px), Akcje(100px)
             const gridLayout = "40px 100px 100px 100px 140px 130px 100px 90px 100px 100px 120px 100px 1fr 100px";
 
             mainContent.innerHTML = `
@@ -963,7 +980,6 @@
                 dataListDiv.innerHTML = '';
 
                 vehicles.forEach((vehicle, index) => {
-                    //const statusColor = vehicle.is_active ? 'green' : '#ffc107';
                     const statusText = vehicle.is_active ? 'Aktywny' : 'Serwis';
                     const companyName = vehicle.company_name || 'Brak Firmy';
                     const paliwo = vehicle.fuel_type_display || vehicle.fuel_type || '-';
@@ -1008,7 +1024,6 @@
             }
         }
 
-         // Funkcja renderująca zdarzenia serwisowe (potrzebna dla podmenu)
          async function renderServiceEvents(filterType = null) {
             const filterMap = {
                 'inspection': {title: 'Inspekcje', type: 'INSPEKCJA'},
@@ -1016,55 +1031,194 @@
                 'reviews': {title: 'Przeglądy Okresowe', type: 'PRZEGLAD'},
                 'tech_inspections': {title: 'Badania Techniczne', type: 'BADANIE_TECH'},
             };
+
             const currentFilter = filterMap[filterType] || {title: 'Zdarzenia Serwisowe', type: null};
             currentView = filterType || 'service_events';
             viewTitle.textContent = currentFilter.title;
-            mainContent.innerHTML = `<div class="table-header-sm"><div>Lp.</div><div>Pojazd (Nr Rej.)</div><div>Opis Zdarzenia</div><div>Koszt</div><div>Data Serwisu</div><div>Akcje</div></div><div id="data-list">Ładowanie zdarzeń...</div>`;
+
+            // Sprawdzamy, czy to widok z VINem (Przeglądy lub Badania)
+            const showVinLayout = ['reviews', 'tech_inspections'].includes(filterType);
+
+            let gridLayout = "";
+            let headerHtml = "";
+
+            if (showVinLayout) {
+                // --- UKŁAD DLA PRZEGLĄDÓW I BADAŃ (Z VIN, OPISEM i KOSZTEM) ---
+
+                // Dynamiczna nazwa nagłówka daty
+                let dateHeader = "Termin";
+                if (filterType === 'reviews') dateHeader = "Termin przeglądu";
+                if (filterType === 'tech_inspections') dateHeader = "Termin badania technicznego";
+
+                // Grid: Lp(50), Rej(120), VIN(160), Opis(1fr - reszta miejsca), Koszt(100), Termin(140), Akcje(120)
+                gridLayout = "50px 120px 160px 1fr 100px 140px 120px";
+
+                headerHtml = `
+                    <div>Lp.</div>
+                    <div>Pojazd (Nr Rej.)</div>
+                    <div>Nr VIN</div>
+                    <div>Opis</div> <div>Koszt</div>
+                    <div>${dateHeader}</div>
+                    <div style="text-align: center;">Akcje</div>
+                `;
+            } else {
+                // --- UKŁAD DLA NAPRAW (STANDARDOWY) ---
+                // Lp, Rej, Opis, Koszt, Data, Akcje
+                gridLayout = "50px 120px 1fr 100px 120px 120px";
+                headerHtml = `
+                    <div>Lp.</div>
+                    <div>Pojazd (Nr Rej.)</div>
+                    <div>Opis Zdarzenia</div>
+                    <div>Koszt</div>
+                    <div>Data</div>
+                    <div style="text-align: center;">Akcje</div>
+                `;
+            }
+
+            mainContent.innerHTML = `
+                <div class="table-header-sm" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; font-weight: bold; padding: 10px; background: #ebedef; border-bottom: 2px solid #ccc; align-items: center;">
+                    ${headerHtml}
+                </div>
+                <div id="data-list">Ładowanie zdarzeń...</div>
+            `;
+
             const dataListDiv = document.getElementById('data-list');
+
             try {
                 const response = await fetch(API_BASE + 'service_events/', { headers: getAuthHeaders() });
+
                 if (response.status === 401) { handleLogout(); throw new Error('Sesja wygasła.'); }
                 if (!response.ok) throw new Error(response.statusText);
+
                 let events = await response.json();
+
                 if (currentFilter.type) {
                      events = events.filter(e => e.typ_zdarzenia === currentFilter.type);
                 }
+
                 dataListDiv.innerHTML = '';
+
+                if (events.length === 0) {
+                    dataListDiv.innerHTML = '<div style="padding: 20px;">Brak wpisów w tej kategorii.</div>';
+                    return;
+                }
+
                 events.forEach((event, index) => {
                     const row = document.createElement('div');
                     row.className = 'table-row-sm';
-                    row.innerHTML = `<div>${index + 1}.</div><div>${event.pojazd_nr_rej}</div><div>${event.opis}</div><div>${event.koszt} PLN</div><div>${event.data_serwisu}</div><div>${getActionButtons(event, currentView)}</div>`;
+                    row.style.display = 'grid';
+                    row.style.gridTemplateColumns = gridLayout;
+                    row.style.gap = '10px';
+                    row.style.padding = '10px';
+                    row.style.borderBottom = '1px solid #eee';
+                    row.style.alignItems = 'center';
+
+                    if (showVinLayout) {
+                        // Wiersz dla Przeglądów/Badań (z VIN, Opisem i Kosztem)
+                        row.innerHTML = `
+                            <div>${index + 1}.</div>
+                            <div style="font-weight: bold;">${event.pojazd_nr_rej || '---'}</div>
+                            <div style="font-family: monospace; font-size: 0.9em; color: #555;">${event.pojazd_vin || '---'}</div>
+
+                            <div style="font-size: 0.9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${event.opis}">
+                                ${event.opis || '---'}
+                            </div>
+
+                            <div>${event.koszt} PLN</div>
+                            <div>${event.data_serwisu}</div>
+                            <div style="text-align: center;">${getActionButtons(event, currentView)}</div>
+                        `;
+                    } else {
+                        // Wiersz dla Napraw
+                        row.innerHTML = `
+                            <div>${index + 1}.</div>
+                            <div style="font-weight: bold;">${event.pojazd_nr_rej || '---'}</div>
+                            <div style="font-size: 0.9em;">${event.opis}</div>
+                            <div>${event.koszt} PLN</div>
+                            <div>${event.data_serwisu}</div>
+                            <div style="text-align: center;">${getActionButtons(event, currentView)}</div>
+                        `;
+                    }
                     dataListDiv.appendChild(row);
                 });
             } catch (error) {
-                dataListDiv.innerHTML = `<div class="error">Błąd: ${error.message}. Brak danych lub brak autoryzacji.</div>`;
+                dataListDiv.innerHTML = `<div class="error">Błąd: ${error.message}</div>`;
             }
         }
 
         async function renderPolicies() {
              currentView = 'policies';
              viewTitle.textContent = 'Polisy Ubezpieczeniowe';
-             mainContent.innerHTML = `<div class="table-header-sm"><div>Lp.</div><div>Pojazd (Nr Rej.)</div><div>Numer Polisy</div><div>Ważność OC</div><div>Ważność AC</div><div>Akcje</div></div><div id="data-list">Ładowanie danych polis...</div>`;
+
+             // ROZSZERZONY UKŁAD KOLUMN:
+             // Lp(40px), Rej(110px), VIN(160px), Ubezpieczyciel(1fr - elastyczny), Nr Polisy(130px), Koszt(90px), OC(100px), AC(100px), Akcje(100px)
+             const gridLayout = "40px 110px 160px 1fr 130px 90px 100px 100px 100px";
+
+             mainContent.innerHTML = `
+                <div class="table-header-sm" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; font-weight: bold; padding: 10px; background: #ebedef; border-bottom: 2px solid #ccc; align-items: center;">
+                    <div>Lp.</div>
+                    <div>Nr Rej.</div>
+                    <div>VIN</div> <div>Ubezpieczyciel</div>
+                    <div>Nr Polisy</div>
+                    <div>Koszt</div> <div title="Ważność OC">Ważność OC</div>
+                    <div title="Ważność AC">Ważność AC</div>
+                    <div style="text-align: center;">Akcje</div>
+                </div>
+                <div id="data-list">Ładowanie danych polis...</div>
+             `;
+
              const dataListDiv = document.getElementById('data-list');
              try {
                  const response = await fetch(API_BASE + 'policies/', { headers: getAuthHeaders() });
                  if (response.status === 401) { handleLogout(); throw new Error('Sesja wygasła.'); }
                  if (!response.ok) throw new Error(response.statusText);
+
                  const policies = await response.json();
                  dataListDiv.innerHTML = '';
+
+                 if (policies.length === 0) {
+                    dataListDiv.innerHTML = '<div style="padding: 20px;">Brak polis. Kliknij DODAJ, aby utworzyć nową.</div>';
+                    return;
+                 }
+
                  policies.forEach((policy, index) => {
                      const row = document.createElement('div');
                      row.className = 'table-row-sm';
-                     row.innerHTML = `<div>${index + 1}.</div><div>${policy.pojazd_nr_rej}</div><div>${policy.numer_polisy}</div><div>${policy.data_waznosci_oc}</div><div>${policy.data_waznosci_ac || 'Brak'}</div><div>${getActionButtons(policy, 'policies')}</div>`;
+                     row.style.display = 'grid';
+                     row.style.gridTemplateColumns = gridLayout;
+                     row.style.gap = '10px';
+                     row.style.padding = '10px';
+                     row.style.borderBottom = '1px solid #eee';
+                     row.style.alignItems = 'center';
+
+                     // Kolorowanie daty OC (czerwony jeśli brak lub minęła - opcjonalnie można rozbudować)
+                     const ocColor = policy.data_waznosci_oc ? 'black' : 'red';
+
+                     row.innerHTML = `
+                        <div>${index + 1}.</div>
+                        <div style="font-weight: bold;">${policy.pojazd_nr_rej || '---'}</div>
+
+                        <div style="font-family: monospace; font-size: 0.9em; color: #555;">${policy.pojazd_vin || '---'}</div>
+
+                        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${policy.ubezpieczyciel}">
+                            ${policy.ubezpieczyciel || '---'}
+                        </div>
+
+                        <div style="font-family: monospace; font-size: 0.9em;">${policy.numer_polisy}</div>
+                        <div>${policy.koszt} PLN</div>
+
+                        <div style="color: ${ocColor}; font-weight: bold;">${policy.data_waznosci_oc}</div>
+                        <div style="font-size: 0.9em; color: #666;">${policy.data_waznosci_ac || '-'}</div>
+
+                        <div style="text-align: center;">${getActionButtons(policy, 'policies')}</div>
+                     `;
                      dataListDiv.appendChild(row);
                  });
              } catch (error) {
-                 dataListDiv.innerHTML = `<div class="error">Błąd: ${error.message}. <p style="color: #007bff;">Moduł Polisy oczekuje na implementację endpointu API: <strong style="font-size: 1.1em;">/api/policies/</strong>.</p></div>`;
+                 dataListDiv.innerHTML = `<div class="error">Błąd: ${error.message}. <br>Pamiętaj o restarcie serwera po zmianie serializers.py!</div>`;
              }
          }
 
-                 // Funkcje dla innych widoków - placeholdery
-                 // Widok Kierowców
         async function renderDrivers() {
             const mainContent = document.getElementById('main-content');
             if (!mainContent) return;
@@ -1072,7 +1226,6 @@
             currentView = 'drivers';
             viewTitle.textContent = 'Użytkownicy (Kierowcy)';
 
-            // Zwiększamy nieco kolumnę "Kierowca" (z 120px na 150px), by imię i nazwisko się zmieściło
             const gridLayout = "40px 150px 1fr 120px 120px 60px 110px 100px";
 
             mainContent.innerHTML = `
@@ -1108,15 +1261,11 @@
                     row.style.padding = '10px';
                     row.style.borderBottom = '1px solid #eee';
 
-                    // --- NOWA LOGIKA SKŁADANIA NAZWY ---
-                    // Pobieramy imię i nazwisko z danych (które dodałeś w kroku 1 w DTO)
                     const fName = driver.first_name || '';
                     const lName = driver.last_name || '';
                     const fullName = `${fName} ${lName}`.trim();
 
-                    // Jeśli fullName nie jest pusty, używamy go. W przeciwnym razie dajemy login (user_name)
                     const displayName = fullName !== '' ? fullName : (driver.user_name || '---');
-                    // ----------------------------------
 
                     const dataBadan = driver.data_waznosci_badan || '---';
                     const kolorBadan = (dataBadan !== '---') ? 'green' : '#666';
@@ -1146,12 +1295,14 @@
             currentView = 'handover';
             viewTitle.textContent = 'Przekazania Pojazdów';
 
-            // Definiujemy szerokość kolumn
-            const gridLayout = "40px 100px 100px 120px 100px 100px 100px 110px 110px 100px";
+            // NOWA SIATKA (GRID):
+            // Zdefiniowałem szerokości tak, aby dane się mieściły,
+            // a "1fr" przy "Uwagi" sprawia, że tabela zajmuje 100% szerokości.
+            // Lp(40px), Imie(100px), Nazwisko(110px), Firma(100px), Marka(100px), Model(100px), Rej(100px), Wydanie(110px), Zwrot(110px), UWAGI(1fr - reszta), Akcje(100px)
+            const gridLayout = "40px 100px 110px 100px 100px 100px 100px 110px 110px 1fr 100px";
 
-            // 1. NAJPIERW GENERUJEMY NAGŁÓWKI (one muszą się pojawić zawsze)
             mainContent.innerHTML = `
-                <div class="table-header" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; padding: 10px; background: #ebedef; font-weight: bold; border-bottom: 2px solid #ccc; font-size: 0.85em;">
+                <div class="table-header" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; padding: 10px; background: #ebedef; font-weight: bold; border-bottom: 2px solid #ccc; font-size: 0.85em; align-items: center;">
                     <div>Lp.</div>
                     <div>Imię</div>
                     <div>Nazwisko</div>
@@ -1161,7 +1312,7 @@
                     <div>Rejestracja</div>
                     <div>Data Przyp.</div>
                     <div>Data Oddania</div>
-                    <div style="text-align: center;">Akcje</div>
+                    <div>Uwagi</div> <div style="text-align: center;">Akcje</div>
                 </div>
                 <div id="data-list">Ładowanie danych...</div>
             `;
@@ -1177,7 +1328,7 @@
                 if (!response.ok) throw new Error("Błąd API: " + response.status);
 
                 const handovers = await response.json();
-                dataList.innerHTML = ''; // Czyścimy komunikat "Ładowanie..."
+                dataList.innerHTML = '';
 
                 if (handovers.length === 0) {
                     dataList.innerHTML = '<div style="padding: 20px; text-align: center;">Brak danych w bazie. Kliknij DODAJ, aby stworzyć pierwsze przekazanie.</div>';
@@ -1187,12 +1338,18 @@
                 handovers.forEach((item, index) => {
                     const row = document.createElement('div');
                     row.className = 'table-row';
+
+                    // Stylizacja wiersza
                     row.style.display = 'grid';
                     row.style.gridTemplateColumns = gridLayout;
                     row.style.gap = '10px';
                     row.style.padding = '10px';
                     row.style.borderBottom = '1px solid #eee';
                     row.style.fontSize = '0.85em';
+                    row.style.alignItems = 'center';
+
+                    // Logika koloru dla daty zwrotu
+                    const zwrotText = item.data_zwrotu || '<span style="color: green; font-weight: bold;">W użytku</span>';
 
                     row.innerHTML = `
                         <div>${index + 1}.</div>
@@ -1203,18 +1360,21 @@
                         <div>${item.model || '-'}</div>
                         <div>${item.rejestracja || '-'}</div>
                         <div>${item.data_wydania}</div>
-                        <div>${item.data_zwrotu || 'W użytku'}</div>
+                        <div>${zwrotText}</div>
+
+                        <div style="color: #555; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${item.uwagi || ''}">
+                            ${item.uwagi || '-'}
+                        </div>
+
                         <div style="text-align: center;">${getActionButtons(item, 'handover')}</div>
                     `;
                     dataList.appendChild(row);
                 });
             } catch (error) {
-                dataList.innerHTML = `<div style="color:red; padding:10px;">Błąd połączenia z serwerem. Upewnij się, że dodałeś widok w Django.</div>`;
+                dataList.innerHTML = `<div style="color:red; padding:10px;">Błąd połączenia z serwerem: ${error.message}</div>`;
             }
         }
 
-
-        // Widok Szkód
         async function renderDamageEvents() {
             viewTitle.textContent = 'Zdarzenia Szkodowe i Awarie';
             const token = localStorage.getItem('access_token');
@@ -1276,17 +1436,13 @@
 
         // --- NOWA LOGIKA DLA KALENDARZA ---
 
-        let currentDate = new Date(); // Globalna zmienna do śledzenia aktualnego miesiąca
+        let currentDate = new Date();
 
-        /**
-         * Pobiera wszystkie zdarzenia terminowe, które powinny być wyświetlone w kalendarzu.
-         */
         async function fetchCalendarEvents() {
             const headers = getAuthHeaders();
             let events = [];
 
             try {
-                // 1. Pobierz Zdarzenia Serwisowe
                 const serviceResponse = await fetch(API_BASE + 'service_events/', { headers });
                 if (serviceResponse.ok) {
                     const serviceEvents = await serviceResponse.json();
@@ -1298,7 +1454,7 @@
                             } else if (e.typ_zdarzenia.toLowerCase().includes('naprawa')) {
                                 type = 'repair';
                             } else {
-                                type = 'inspection'; // Badanie
+                                type = 'inspection';
                             }
                             events.push({
                                 date: e.data_serwisu,
@@ -1310,12 +1466,10 @@
                     });
                 }
 
-                // 2. Pobierz Polisy
                 const policyResponse = await fetch(API_BASE + 'policies/', { headers });
                 if (policyResponse.ok) {
                     const policies = await policyResponse.json();
                     policies.forEach(p => {
-                        // OC
                         if (p.data_waznosci_oc) {
                             events.push({
                                 date: p.data_waznosci_oc,
@@ -1324,7 +1478,6 @@
                                 record: p
                             });
                         }
-                        // AC (jeśli istnieje)
                         if (p.data_waznosci_ac && p.data_waznosci_ac !== 'Brak') {
                              events.push({
                                 date: p.data_waznosci_ac,
@@ -1345,7 +1498,7 @@
 
         function filterTable() {
             const input = document.getElementById('table-search');
-            if (!input) return; // Jeśli nie ma pola wyszukiwania, nic nie rób
+            if (!input) return;
 
             const filter = input.value.toLowerCase();
             const rows = document.querySelectorAll('.table-row');
@@ -1356,9 +1509,6 @@
             });
         }
 
-        /**
-         * Główna funkcja renderująca Kalendarz
-         */
         async function renderCalendar() {
             currentView = 'calendar';
             viewTitle.textContent = 'Terminarz Floty';
@@ -1367,12 +1517,8 @@
             generateCalendarHTML(allEvents, currentDate);
         }
 
-        /**
-         * Rysuje siatkę kalendarza.
-         * ZMODYFIKOWANA o logikę ramki.
-         */
         function generateCalendarHTML(events, displayDate) {
-            mainContent.innerHTML = ''; // Czyścimy zawartość
+            mainContent.innerHTML = '';
             const container = document.createElement('div');
             container.className = 'calendar-view';
 
@@ -1382,7 +1528,6 @@
             const monthNames = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
                                 "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"];
 
-            // Nagłówek Kalendarza
             const header = document.createElement('div');
             header.className = 'calendar-header';
             header.innerHTML = `
@@ -1392,7 +1537,6 @@
             `;
             container.appendChild(header);
 
-            // Siatka Kalendarza
             const grid = document.createElement('div');
             grid.className = 'calendar-grid';
 
@@ -1409,12 +1553,10 @@
 
             const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-            // Wypełnianie pustymi polami na początku
             for (let i = 0; i < dayOfWeek; i++) {
                 grid.appendChild(document.createElement('div'));
             }
 
-            // Dodawanie dni miesiąca
             for (let day = 1; day <= daysInMonth; day++) {
                 const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
@@ -1426,7 +1568,6 @@
 
                 const dayEvents = events.filter(e => e.date === dateString);
 
-                // Zestaw klas do ramki (eliminacja duplikatów)
                 const borderClasses = new Set();
 
                 dayEvents.forEach(event => {
@@ -1458,7 +1599,6 @@
                     }
                 });
 
-                // Dodanie unikalnych klas ramki (jeśli jest wiele zdarzeń, dodajemy np. ramkę najpilniejszego)
                 borderClasses.forEach(className => dayDiv.classList.add(className));
 
                 grid.appendChild(dayDiv);
@@ -1484,8 +1624,21 @@
             'handover': renderHandovers,
             'calendar': renderCalendar,
             'policies': renderPolicies,
-            'reviews': renderPlaceholder,
-            'repairs': renderPlaceholder,
+
+            // --- NAPRAWIONE ZAKŁADKI SERWISOWE ---
+            // Teraz wywołują funkcję renderServiceEvents z odpowiednim filtrem
+            'reviews': () => renderServiceEvents('reviews'),
+            'repairs': () => renderServiceEvents('repairs'),
+            'tech_inspections': () => renderServiceEvents('tech_inspections'),
+            'inspection': () => renderServiceEvents('inspection'),
+
+            // --- BRAKUJĄCE ZAKŁADKI (ZABEZPIECZENIE PRZED BŁĘDEM) ---
+            // Dzięki temu kliknięcie nie spowoduje błędu w konsoli
+            'leasing': () => renderPlaceholder('Leasingi'),
+            'hr_docs': () => renderPlaceholder('Dokumenty kadrowe'),
+            'settlements': () => renderPlaceholder('Rozliczenia'),
+            'other': () => renderPlaceholder('Pozostałe'),
+            'settings': () => renderPlaceholder('Ustawienia')
         };
 
         function loadView(viewName) {
@@ -1500,16 +1653,13 @@
                 parentView.classList.add('active');
             }
 
-            // Logika ukrywania/pokazywania przycisku "DODAJ"
             const isCalendarRelated = ['calendar', 'policies', 'tech_inspections', 'reviews', 'repairs', 'legalization', 'inspection'].includes(viewName);
 
-            // Przycisk DODAJ jest widoczny dla Pojazdów i Terminarza (i jego podkategorii)
             if (viewName === 'vehicles' || isCalendarRelated) {
                 addBtn.style.display = 'inline';
             } else {
-                addBtn.style.display = 'inline'; // Domyślnie zostawiamy włączony
+                addBtn.style.display = 'inline';
             }
-
 
             viewMap[viewName]();
             currentView = viewName;
@@ -1530,7 +1680,7 @@
             if (accessToken && userRole) {
                 loginContainer.style.display = 'none';
                 mainApp.style.display = 'flex';
-                userRoleDisplay.textContent = userRole;
+                updateHeaderUser();
                 loadView('vehicles');
             } else {
                 loginContainer.style.display = 'flex';

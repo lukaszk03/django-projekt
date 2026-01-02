@@ -45,19 +45,19 @@ class DamageEventDto(serializers.ModelSerializer):
         fields = ['id', 'pojazd', 'pojazd_nr_rej', 'opis', 'data_zdarzenia', 'szacowany_koszt',
                   'zgloszony_do_ubezpieczyciela', 'status_naprawy']
 
-        # USUNĄŁEM LINIĘ PONIŻEJ (extra_kwargs), ABY FORMULARZ WIDZIAŁ ID POJAZDU:
-        # extra_kwargs = {'pojazd': {'write_only': True}}
-
 # 4. POLISY
 class InsurancePolicyDto(serializers.ModelSerializer):
     pojazd_nr_rej = serializers.CharField(source='pojazd.registration_number', read_only=True)
+    # DODANO: Numer VIN (niezbędny do wyświetlenia w tabeli)
+    pojazd_vin = serializers.ReadOnlyField(source='pojazd.vin')
 
     class Meta:
         model = InsurancePolicy
-        fields = ['id', 'pojazd', 'pojazd_nr_rej', 'numer_polisy', 'ubezpieczyciel', 'data_waznosci_oc', 'data_waznosci_ac', 'koszt']
+        # Dodajemy 'pojazd_vin' do listy pól
+        fields = ['id', 'pojazd', 'pojazd_nr_rej', 'pojazd_vin', 'numer_polisy', 'ubezpieczyciel', 'data_waznosci_oc', 'data_waznosci_ac', 'koszt']
         extra_kwargs = {'pojazd': {'write_only': True}}
 
-# 5. PRZEKAZANIA (TUTAJ BYŁ BŁĄD)
+# 5. PRZEKAZANIA
 class VehicleHandoverDto(serializers.ModelSerializer):
     imie = serializers.ReadOnlyField(source='kierowca.user.first_name')
     nazwisko = serializers.ReadOnlyField(source='kierowca.user.last_name')
@@ -66,8 +66,17 @@ class VehicleHandoverDto(serializers.ModelSerializer):
     model = serializers.ReadOnlyField(source='pojazd.model')
     rejestracja = serializers.ReadOnlyField(source='pojazd.registration_number')
 
-    # POPRAWIONE WCIĘCIE PONIŻEJ:
     class Meta:
         model = VehicleHandover
         fields = ['id', 'kierowca', 'pojazd', 'imie', 'nazwisko', 'firma',
                   'marka', 'model', 'rejestracja', 'data_wydania', 'data_zwrotu', 'uwagi']
+
+# 6. ZDARZENIA SERWISOWE (Inspekcje, Przeglądy, Naprawy) - NOWE
+class ServiceEventDto(serializers.ModelSerializer):
+    pojazd_nr_rej = serializers.ReadOnlyField(source='pojazd.registration_number')
+    # TO JEST KLUCZOWE POLE DLA CIEBIE (NR VIN):
+    pojazd_vin = serializers.ReadOnlyField(source='pojazd.vin')
+
+    class Meta:
+        model = ServiceEvent
+        fields = ['id', 'pojazd', 'pojazd_nr_rej', 'pojazd_vin', 'opis', 'data_serwisu', 'koszt', 'typ_zdarzenia']
