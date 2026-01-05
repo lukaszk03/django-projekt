@@ -697,6 +697,19 @@
             }
             // 6. REZERWACJE (NAPRAWIONE - PRZENIESIONE NA GŁÓWNY POZIOM)
             else if (viewName === 'reservations') {
+                // 1. POBIERANIE LISTY POJAZDÓW
+                let vehicleOptions = '<option value="" selected>-- Brak / Dowolny --</option>';
+                try {
+                    const vehicles = await fetchVehicles(); // Używamy Twojej istniejącej funkcji
+                    vehicleOptions += vehicles.map(v => {
+                        // Sprawdzamy czy to auto jest przypisane do edytowanego rekordu
+                        const isSelected = (record && record.assigned_vehicle === v.id) ? 'selected' : '';
+                        return `<option value="${v.id}" ${isSelected}>${v.registration_number} (${v.marka} ${v.model})</option>`;
+                    }).join('');
+                } catch (e) {
+                    console.error("Błąd pobierania pojazdów do listy:", e);
+                }
+
                 const sel = (val) => (record?.vehicle_type === val ? 'selected' : '');
                 const stSel = (val) => (record?.status === val ? 'selected' : '');
 
@@ -707,7 +720,8 @@
                     <label>Nazwisko kierowcy:</label>
                     <input type="text" id="r_last_name" value="${record?.last_name || ''}" required placeholder="np. Kowalski">
 
-                    <label>Nazwa Firmy:</label> <input type="text" id="r_company" value="${record?.company || ''}" required placeholder="Wpisz nazwę firmy">
+                    <label>Nazwa Firmy:</label>
+                    <input type="text" id="r_company" value="${record?.company || ''}" required placeholder="Wpisz nazwę firmy">
 
                     <div style="display:flex; gap:10px;">
                         <div style="flex:1;">
@@ -720,13 +734,18 @@
                         </div>
                     </div>
 
-                    <label>Typ pojazdu:</label>
+                    <label>Preferowany Typ pojazdu (Ogólny):</label>
                     <select id="r_vehicle_type">
                         <option value="OSOBOWE" ${sel('OSOBOWE')}>Osobowe</option>
                         <option value="CIEZAROWE" ${sel('CIEZAROWE')}>Ciężarowe</option>
                         <option value="AUTOBUSY" ${sel('AUTOBUSY')}>Autobusy</option>
                         <option value="SUV" ${sel('SUV')}>SUV</option>
                         <option value="KOMBI" ${sel('KOMBI')}>Kombi</option>
+                    </select>
+
+                    <label style="color: #007bff; font-weight: bold; margin-top: 10px;">Przypisz konkretny pojazd (z bazy):</label>
+                    <select id="r_assigned_vehicle" style="border: 1px solid #007bff; background-color: #f0f8ff;">
+                        ${vehicleOptions}
                     </select>
 
                     <label>Status:</label>
@@ -871,6 +890,7 @@
                     };
                 }
                 else if (currentView === 'reservations') {
+                    const assignedVehicleVal = document.getElementById('r_assigned_vehicle').value;
                     data = {
                         first_name: document.getElementById('r_first_name').value,
                         last_name: document.getElementById('r_last_name').value,
@@ -881,6 +901,8 @@
                         date_to: document.getElementById('r_date_to').value,
 
                         vehicle_type: document.getElementById('r_vehicle_type').value,
+
+                        assigned_vehicle: assignedVehicleVal ? parseInt(assignedVehicleVal) : null,
                         status: document.getElementById('r_status').value
                     };
                 }
@@ -1430,8 +1452,8 @@
             currentView = 'reservations';
             viewTitle.textContent = 'Rezerwacje Pojazdów';
 
-            // Grid: Lp, Imię, Nazwisko, Firma, Typ Auta, Data, Status, Akcje
-            const gridLayout = "40px 1fr 1fr 1.5fr 120px 110px 130px 100px";
+            // Grid: Lp, Imię, Nazwisko, Firma, Typ, Pojazd, Data, Status, Akcje
+            const gridLayout = "40px 100px 100px 120px 100px 120px 140px 130px 100px";
 
             mainContent.innerHTML = `
                 <div class="table-header-sm" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; font-weight: bold; padding: 10px; background: #ebedef; border-bottom: 2px solid #ccc; align-items: center;">
@@ -1439,9 +1461,9 @@
                     <div>Imię</div>
                     <div>Nazwisko</div>
                     <div>Firma</div>
-                    <div>Typ Auta</div>
-                    <div>Termin</div>
-                    <div>Status</div> <div style="text-align: center;">Akcje</div>
+                    <div>Typ</div>    <div>Pojazd</div> <div>Termin</div>
+                    <div>Status</div>
+                    <div style="text-align: center;">Akcje</div>
                 </div>
                 <div id="data-list">Ładowanie rezerwacji...</div>
             `;
@@ -1480,15 +1502,25 @@
 
                     const dOd = item.date_from || '<span style="color:#ccc">---</span>';
                     const dDo = item.date_to || '<span style="color:#ccc">---</span>';
-
                     const terminHtml = `<div style="font-size:0.9em; line-height:1.4em;">Od: <b>${dOd}</b><br>Do: <b>${dDo}</b></div>`;
+
+                    const typHtml = `<span class="badge" style="background:#e6f7ff; padding: 2px 5px; border-radius:4px; font-size:0.9em;">${item.vehicle_type}</span>`;
+
+                    // Kolumna POJAZD (Rejestracja lub ---)
+                    let pojazdHtml = '<span style="color: #ccc;">---</span>';
+                    if (item.assigned_vehicle_display) {
+                        pojazdHtml = `<strong style="color: #007bff;">${item.assigned_vehicle_display}</strong>`;
+                    }
 
                     row.innerHTML = `
                         <div>${index + 1}.</div>
                         <div>${item.first_name}</div>
                         <div style="font-weight: bold;">${item.last_name}</div>
                         <div>${item.company}</div>
-                        <div><span class="badge" style="background:#e6f7ff; padding: 3px 6px; border-radius:4px;">${item.vehicle_type}</span></div>
+
+                        <div>${typHtml}</div>
+                        <div>${pojazdHtml}</div>
+
                         <div>${terminHtml}</div>
 
                         <div>

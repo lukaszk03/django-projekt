@@ -83,7 +83,8 @@ class ServiceEventDto(serializers.ModelSerializer):
 
 # 7. REZERWACJE (NOWE)
 class ReservationDto(serializers.ModelSerializer):
+    assigned_vehicle_display = serializers.ReadOnlyField(source='assigned_vehicle.registration_number')
 
     class Meta:
         model = Reservation
-        fields = ['id', 'first_name', 'last_name', 'company', 'date_from', 'date_to', 'vehicle_type', 'status', 'created_at']
+        fields = ['id', 'first_name', 'last_name', 'company', 'date_from', 'date_to', 'vehicle_type', 'status', 'created_at', 'assigned_vehicle', 'assigned_vehicle_display']

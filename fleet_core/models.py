@@ -241,6 +241,14 @@ class Reservation(models.Model):
         verbose_name="Typ Pojazdu"
     )
 
+    assigned_vehicle = models.ForeignKey(
+        Vehicle,
+        on_delete=models.SET_NULL,  # Jeśli usuniesz auto, rezerwacja zostanie (z pustym polem)
+        null=True,
+        blank=True,
+        verbose_name="Przypisany Pojazd"
+    )
+
     # NOWE POLE: STATUS
     STATUS_CHOICES = [
         ('OCZEKUJACE', 'Oczekujące'),
