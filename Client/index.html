@@ -755,6 +755,9 @@
                         <option value="ZATWIERDZONE" ${stSel('ZATWIERDZONE')}>Zatwierdzone</option>
                         <option value="ODRZUCONE" ${stSel('ODRZUCONE')}>Odrzucone</option>
                     </select>
+
+                    <label style="margin-top: 10px;">Dodatkowe informacje (dla kierowcy):</label>
+                    <textarea id="r_additional_info" rows="3" placeholder="Np. Pojazd czeka na parkingu B, kluczyki w recepcji...">${record?.additional_info || ''}</textarea>
                 `;
             }
             // 7. EDYCJA ISTNIEJĄCYCH ZDARZEŃ (POLISY, BADANIA, NAPRAWY)
@@ -903,7 +906,9 @@
                         vehicle_type: document.getElementById('r_vehicle_type').value,
 
                         assigned_vehicle: assignedVehicleVal ? parseInt(assignedVehicleVal) : null,
-                        status: document.getElementById('r_status').value
+                        status: document.getElementById('r_status').value,
+
+                        additional_info: document.getElementById('r_additional_info').value
                     };
                 }
                 // --- EDYCJA ISTNIEJĄCYCH (POLISY I SERWIS) ---
@@ -1452,8 +1457,9 @@
             currentView = 'reservations';
             viewTitle.textContent = 'Rezerwacje Pojazdów';
 
-            // Grid: Lp, Imię, Nazwisko, Firma, Typ, Pojazd, Data, Status, Akcje
-            const gridLayout = "40px 100px 100px 120px 100px 120px 140px 130px 100px";
+            // ZMIANA GRIDU: Dodajemy kolumnę "Info" (1fr - zajmie resztę miejsca)
+            // Lp, Imię, Nazwisko, Firma, Typ, Pojazd, Termin, Status, INFO, Akcje
+            const gridLayout = "40px 100px 100px 120px 100px 120px 140px 130px 1fr 100px";
 
             mainContent.innerHTML = `
                 <div class="table-header-sm" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; font-weight: bold; padding: 10px; background: #ebedef; border-bottom: 2px solid #ccc; align-items: center;">
@@ -1461,9 +1467,11 @@
                     <div>Imię</div>
                     <div>Nazwisko</div>
                     <div>Firma</div>
-                    <div>Typ</div>    <div>Pojazd</div> <div>Termin</div>
+                    <div>Typ</div>
+                    <div>Pojazd</div>
+                    <div>Termin</div>
                     <div>Status</div>
-                    <div style="text-align: center;">Akcje</div>
+                    <div>Info</div> <div style="text-align: center;">Akcje</div>
                 </div>
                 <div id="data-list">Ładowanie rezerwacji...</div>
             `;
@@ -1492,42 +1500,43 @@
                     row.style.borderBottom = '1px solid #eee';
                     row.style.alignItems = 'center';
 
-                    // Kolory statusów
                     let statusColor = '#333';
                     let statusBg = '#f0f0f0';
-                    if (item.status === 'OCZEKUJACE') { statusColor = '#856404'; statusBg = '#fff3cd'; } // Żółty
-                    if (item.status === 'PRZYJETE') { statusColor = '#004085'; statusBg = '#cce5ff'; } // Niebieski
-                    if (item.status === 'ZATWIERDZONE') { statusColor = '#155724'; statusBg = '#d4edda'; } // Zielony
-                    if (item.status === 'ODRZUCONE') { statusColor = '#721c24'; statusBg = '#f8d7da'; } // Czerwony
+                    if (item.status === 'OCZEKUJACE') { statusColor = '#856404'; statusBg = '#fff3cd'; }
+                    if (item.status === 'PRZYJETE') { statusColor = '#004085'; statusBg = '#cce5ff'; }
+                    if (item.status === 'ZATWIERDZONE') { statusColor = '#155724'; statusBg = '#d4edda'; }
+                    if (item.status === 'ODRZUCONE') { statusColor = '#721c24'; statusBg = '#f8d7da'; }
 
                     const dOd = item.date_from || '<span style="color:#ccc">---</span>';
                     const dDo = item.date_to || '<span style="color:#ccc">---</span>';
-                    const terminHtml = `<div style="font-size:0.9em; line-height:1.4em;">Od: <b>${dOd}</b><br>Do: <b>${dDo}</b></div>`;
+                    const terminHtml = `<div style="font-size:0.85em; line-height:1.4em;">Od: <b>${dOd}</b><br>Do: <b>${dDo}</b></div>`;
 
                     const typHtml = `<span class="badge" style="background:#e6f7ff; padding: 2px 5px; border-radius:4px; font-size:0.9em;">${item.vehicle_type}</span>`;
 
-                    // Kolumna POJAZD (Rejestracja lub ---)
                     let pojazdHtml = '<span style="color: #ccc;">---</span>';
                     if (item.assigned_vehicle_display) {
                         pojazdHtml = `<strong style="color: #007bff;">${item.assigned_vehicle_display}</strong>`;
                     }
+
+                    // Obsługa wyświetlania notatki
+                    const infoText = item.additional_info
+                        ? `<span title="${item.additional_info}" style="cursor:help; color:#555; font-style:italic;">${item.additional_info}</span>`
+                        : '<span style="color:#ccc;">-</span>';
 
                     row.innerHTML = `
                         <div>${index + 1}.</div>
                         <div>${item.first_name}</div>
                         <div style="font-weight: bold;">${item.last_name}</div>
                         <div>${item.company}</div>
-
                         <div>${typHtml}</div>
                         <div>${pojazdHtml}</div>
-
                         <div>${terminHtml}</div>
-
                         <div>
                             <span style="background-color: ${statusBg}; color: ${statusColor}; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85em;">
                                 ${item.status}
                             </span>
                         </div>
+                        <div style="font-size: 0.85em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${infoText}</div>
 
                         <div style="text-align: center;">${getActionButtons(item, 'reservations')}</div>
                     `;

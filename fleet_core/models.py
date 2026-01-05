@@ -249,6 +249,12 @@ class Reservation(models.Model):
         verbose_name="Przypisany Pojazd"
     )
 
+    additional_info = models.TextField(
+        verbose_name="Dodatkowe informacje",
+        null=True,
+        blank=True
+    )
+
     # NOWE POLE: STATUS
     STATUS_CHOICES = [
         ('OCZEKUJACE', 'Oczekujące'),
@@ -271,3 +277,4 @@ class Reservation(models.Model):
     class Meta:
         verbose_name = "Rezerwacja"
         verbose_name_plural = "Rezerwacje"
+
