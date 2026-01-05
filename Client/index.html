@@ -698,7 +698,7 @@
             // 6. REZERWACJE (NAPRAWIONE - PRZENIESIONE NA GŁÓWNY POZIOM)
             else if (viewName === 'reservations') {
                 const sel = (val) => (record?.vehicle_type === val ? 'selected' : '');
-                const stSel = (val) => (record?.status === val ? 'selected' : ''); // Helper do statusu
+                const stSel = (val) => (record?.status === val ? 'selected' : '');
 
                 formHtml = `
                     <label>Imię kierowcy:</label>
@@ -709,8 +709,16 @@
 
                     <label>Nazwa Firmy:</label> <input type="text" id="r_company" value="${record?.company || ''}" required placeholder="Wpisz nazwę firmy">
 
-                    <label>Data Rezerwacji:</label>
-                    <input type="date" id="r_date" value="${record?.reservation_date || ''}" required>
+                    <div style="display:flex; gap:10px;">
+                        <div style="flex:1;">
+                            <label>Data Od:</label>
+                            <input type="date" id="r_date_from" value="${record?.date_from || ''}" required>
+                        </div>
+                        <div style="flex:1;">
+                            <label>Data Do:</label>
+                            <input type="date" id="r_date_to" value="${record?.date_to || ''}" required>
+                        </div>
+                    </div>
 
                     <label>Typ pojazdu:</label>
                     <select id="r_vehicle_type">
@@ -866,14 +874,13 @@
                     data = {
                         first_name: document.getElementById('r_first_name').value,
                         last_name: document.getElementById('r_last_name').value,
-
-                        // ZMIANA: Pobieramy tekst, a nie liczbę!
                         company: document.getElementById('r_company').value,
 
-                        reservation_date: document.getElementById('r_date').value,
-                        vehicle_type: document.getElementById('r_vehicle_type').value,
+                        // ZMIANA: Pobieramy dwie daty
+                        date_from: document.getElementById('r_date_from').value,
+                        date_to: document.getElementById('r_date_to').value,
 
-                        // NOWE: Pobieramy status
+                        vehicle_type: document.getElementById('r_vehicle_type').value,
                         status: document.getElementById('r_status').value
                     };
                 }
@@ -1433,7 +1440,7 @@
                     <div>Nazwisko</div>
                     <div>Firma</div>
                     <div>Typ Auta</div>
-                    <div>Na kiedy?</div>
+                    <div>Termin</div>
                     <div>Status</div> <div style="text-align: center;">Akcje</div>
                 </div>
                 <div id="data-list">Ładowanie rezerwacji...</div>
@@ -1471,13 +1478,18 @@
                     if (item.status === 'ZATWIERDZONE') { statusColor = '#155724'; statusBg = '#d4edda'; } // Zielony
                     if (item.status === 'ODRZUCONE') { statusColor = '#721c24'; statusBg = '#f8d7da'; } // Czerwony
 
+                    const dOd = item.date_from || '<span style="color:#ccc">---</span>';
+                    const dDo = item.date_to || '<span style="color:#ccc">---</span>';
+
+                    const terminHtml = `<div style="font-size:0.9em; line-height:1.4em;">Od: <b>${dOd}</b><br>Do: <b>${dDo}</b></div>`;
+
                     row.innerHTML = `
                         <div>${index + 1}.</div>
                         <div>${item.first_name}</div>
                         <div style="font-weight: bold;">${item.last_name}</div>
                         <div>${item.company}</div>
                         <div><span class="badge" style="background:#e6f7ff; padding: 3px 6px; border-radius:4px;">${item.vehicle_type}</span></div>
-                        <div>${item.reservation_date}</div>
+                        <div>${terminHtml}</div>
 
                         <div>
                             <span style="background-color: ${statusBg}; color: ${statusColor}; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85em;">

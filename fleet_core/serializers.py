@@ -86,4 +86,4 @@ class ReservationDto(serializers.ModelSerializer):
 
     class Meta:
         model = Reservation
-        fields = ['id', 'first_name', 'last_name', 'company', 'company', 'reservation_date', 'vehicle_type', 'status', 'created_at']
+        fields = ['id', 'first_name', 'last_name', 'company', 'date_from', 'date_to', 'vehicle_type', 'status', 'created_at']

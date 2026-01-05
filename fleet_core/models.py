@@ -232,7 +232,8 @@ class Reservation(models.Model):
     # ZMIANA: Zamiast ForeignKey, zwykłe pole tekstowe
     company = models.CharField(max_length=200, verbose_name="Nazwa Firmy")
 
-    reservation_date = models.DateField(verbose_name="Data Rezerwacji")
+    date_from = models.DateField(verbose_name="Data Od", null=True, blank=True)
+    date_to = models.DateField(verbose_name="Data Do", null=True, blank=True)
 
     vehicle_type = models.CharField(
         max_length=30,
