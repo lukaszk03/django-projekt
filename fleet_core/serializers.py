@@ -1,7 +1,7 @@
 # Master/Server/fleet_core/serializers.py
 
 from rest_framework import serializers
-from .models import Vehicle, Driver, ServiceEvent, DamageEvent, FleetCompany, InsurancePolicy, VehicleHandover, Reservation
+from .models import Vehicle, Driver, ServiceEvent, DamageEvent, FleetCompany, InsurancePolicy, VehicleHandover, Reservation, ReservationFile
 
 # 1. SERIALIZER DLA POJAZDÓW
 class VehicleDto(serializers.ModelSerializer):
@@ -81,25 +81,80 @@ class ServiceEventDto(serializers.ModelSerializer):
         model = ServiceEvent
         fields = ['id', 'pojazd', 'pojazd_nr_rej', 'pojazd_vin', 'opis', 'data_serwisu', 'koszt', 'typ_zdarzenia']
 
+
+class ReservationFileDto(serializers.ModelSerializer):
+    class Meta:
+        model = ReservationFile
+        fields = ['id', 'file', 'uploaded_at']
+
 # 7. REZERWACJE (NOWE)
 class ReservationDto(serializers.ModelSerializer):
     assigned_vehicle_display = serializers.ReadOnlyField(source='assigned_vehicle.registration_number')
 
-    remove_scan = serializers.BooleanField(write_only=True, required=False)
+    #remove_scan = serializers.BooleanField(write_only=True, required=False)
+
+    # DO ODCZYTU: Lista już wgranych plików
+    attachments = ReservationFileDto(many=True, read_only=True)
+
+    # DO ZAPISU: Lista nowych plików (ListField z FileField)
+    new_files = serializers.ListField(
+        child=serializers.FileField(),
+        write_only=True,
+        required=False
+    )
+
+    # DO USUWANIA: Lista ID plików do usunięcia
+    remove_attachment_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
 
     class Meta:
         model = Reservation
-        fields = ['id', 'first_name', 'last_name', 'company', 'date_from', 'date_to', 'vehicle_type', 'status', 'created_at', 'assigned_vehicle', 'assigned_vehicle_display', 'additional_info', 'scan_agreement', 'remove_scan']
+        fields = [
+            'id', 'first_name', 'last_name', 'company',
+            'date_from', 'date_to', 'vehicle_type', 'status',
+            'created_at', 'assigned_vehicle', 'assigned_vehicle_display',
+            'additional_info',
+            'attachments',  # <-- To pokaże listę plików w JSON
+            'new_files',  # <-- To przyjmie nowe pliki
+            'remove_attachment_ids'  # <-- To przyjmie ID do usunięcia
+        ]
+
+    def create(self, validated_data):
+        new_files = validated_data.pop('new_files', [])
+        validated_data.pop('remove_attachment_ids', [])  # Przy tworzeniu nie usuwamy
+
+        reservation = Reservation.objects.create(**validated_data)
+
+        # Tworzymy obiekty plików
+        for file in new_files:
+            ReservationFile.objects.create(reservation=reservation, file=file)
+
+        return reservation
 
     def update(self, instance, validated_data):
-        # Sprawdzamy, czy przesłano flagę usunięcia
-        remove_scan = validated_data.pop('remove_scan', False)
+        new_files = validated_data.pop('new_files', [])
+        remove_ids = validated_data.pop('remove_attachment_ids', [])
 
-        if remove_scan:
-            # Jeśli jest plik, usuwamy go fizycznie i czyścimy pole
-            if instance.scan_agreement:
-                instance.scan_agreement.delete(save=False)
-                instance.scan_agreement = None
+        # 1. Usuwanie wskazanych plików
+        if remove_ids:
+            # Filtrujemy, żeby usunąć tylko pliki należące do tej rezerwacji
+            files_to_delete = ReservationFile.objects.filter(
+                id__in=remove_ids,
+                reservation=instance
+            )
+            for f in files_to_delete:
+                f.file.delete(save=False)  # Usuń fizyczny plik z dysku
+                f.delete()  # Usuń wpis z bazy
 
-        # Wykonujemy standardową aktualizację reszty pól
+        # 2. Dodawanie nowych plików
+        for file in new_files:
+            ReservationFile.objects.create(reservation=instance, file=file)
+
+        # 3. Standardowa aktualizacja reszty pól
         return super().update(instance, validated_data)
+
+
+

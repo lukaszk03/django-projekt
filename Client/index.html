@@ -713,27 +713,28 @@
                 const sel = (val) => (record?.vehicle_type === val ? 'selected' : '');
                 const stSel = (val) => (record?.status === val ? 'selected' : '');
 
-                let fileHtml = '';
-                if (record && record.scan_agreement) {
-                    // Jeśli plik istnieje, pokazujemy link ORAZ opcję usunięcia
-                    fileHtml = `
-                        <div style="margin-top: 5px; background: #e9ecef; padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
-                            <div style="margin-bottom: 5px;">
-                                Aktualny plik: <a href="${record.scan_agreement}" target="_blank" style="color: blue; font-weight: bold;">Pobierz PDF</a>
-                            </div>
-                            <div style="border-top: 1px solid #ccc; padding-top: 5px;">
-                                <input type="checkbox" id="r_remove_scan" style="width: auto; margin-right: 5px;">
-                                <label for="r_remove_scan" style="color: #dc3545; cursor: pointer; font-weight: bold;">Usuń ten załącznik</label>
-                            </div>
-                        </div>
-                    `;
-                }
+                let attachmentsHtml = '';
+                if (record && record.attachments && record.attachments.length > 0) {
+                    attachmentsHtml = '<div style="margin-top: 5px; background: #fff; border: 1px solid #ccc; padding: 10px; border-radius: 4px;"><strong>Załączone pliki:</strong><ul style="list-style: none; padding-left: 0; margin-top: 5px;">';
 
-                formHtml = `
-                    <label style="margin-top: 10px; font-weight:bold;">Skan Umowy / Dokument (PDF):</label>
-                    <input type="file" id="r_scan_agreement" accept="application/pdf,image/*">
-                    ${fileHtml}
-                `;
+                    record.attachments.forEach(file => {
+                        // Wyciągamy nazwę pliku z URL
+                        const fileName = file.file.split('/').pop();
+                        attachmentsHtml += `
+                            <li style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px solid #eee;">
+                                <a href="${file.file}" target="_blank" style="color: blue; text-decoration: none;">📄 ${fileName}</a>
+
+                                <div style="display: flex; align-items: center; gap: 5px;">
+                                    <input type="checkbox" class="remove-attachment-cb" value="${file.id}" id="remove_file_${file.id}">
+                                    <label for="remove_file_${file.id}" style="color: #dc3545; font-size: 0.85em; cursor: pointer;">Usuń</label>
+                                </div>
+                            </li>
+                        `;
+                    });
+                    attachmentsHtml += '</ul></div>';
+                } else {
+                    attachmentsHtml = '<div style="font-size: 0.9em; color: #777; margin-top:5px;">Brak załączników.</div>';
+                }
 
                 formHtml = `
                     <label>Imię kierowcy:</label> <input type="text" id="r_first_name" value="${record?.first_name || ''}" required>
@@ -768,9 +769,11 @@
                     <label style="margin-top: 10px;">Dodatkowe informacje:</label>
                     <textarea id="r_additional_info" rows="2">${record?.additional_info || ''}</textarea>
 
-                    <label style="margin-top: 10px; font-weight:bold;">Skan Umowy / Dokument (PDF):</label>
-                    <input type="file" id="r_scan_agreement" accept="application/pdf,image/*">
-                    ${fileHtml}
+                    <label style="margin-top: 15px; font-weight:bold; color: #28a745;">Dodaj pliki (Dokumenty/Zdjęcia):</label>
+                    <input type="file" id="r_new_files" multiple accept="application/pdf,image/*">
+                    <small style="color:#666;">Możesz zaznaczyć wiele plików (przytrzymaj Ctrl).</small>
+
+                    ${attachmentsHtml}
                 `;
             }
             // 7. EDYCJA ISTNIEJĄCYCH ZDARZEŃ (POLISY, BADANIA, NAPRAWY)
@@ -907,37 +910,40 @@
                 }
                 // 6. REZERWACJE (Poprawiona logika FormData)
                 else if (currentView === 'reservations') {
-                    const formData = new FormData();
+                        const formData = new FormData();
 
-                    formData.append('first_name', document.getElementById('r_first_name').value);
-                    formData.append('last_name', document.getElementById('r_last_name').value);
-                    formData.append('company', document.getElementById('r_company').value);
-                    formData.append('date_from', document.getElementById('r_date_from').value);
-                    formData.append('date_to', document.getElementById('r_date_to').value);
-                    formData.append('vehicle_type', document.getElementById('r_vehicle_type').value);
-                    formData.append('status', document.getElementById('r_status').value);
-                    formData.append('additional_info', document.getElementById('r_additional_info').value);
+                        formData.append('first_name', document.getElementById('r_first_name').value);
+                        formData.append('last_name', document.getElementById('r_last_name').value);
+                        formData.append('company', document.getElementById('r_company').value);
+                        formData.append('date_from', document.getElementById('r_date_from').value);
+                        formData.append('date_to', document.getElementById('r_date_to').value);
+                        formData.append('vehicle_type', document.getElementById('r_vehicle_type').value);
+                        formData.append('status', document.getElementById('r_status').value);
+                        formData.append('additional_info', document.getElementById('r_additional_info').value);
 
-                    const assignedVal = document.getElementById('r_assigned_vehicle').value;
-                    if (assignedVal) {
-                        formData.append('assigned_vehicle', parseInt(assignedVal));
-                    }
+                        const assignedVal = document.getElementById('r_assigned_vehicle').value;
+                        if (assignedVal) {
+                            formData.append('assigned_vehicle', parseInt(assignedVal));
+                        }
 
-                    // --- OBSŁUGA PLIKÓW I USUWANIA ---
-                    const fileInput = document.getElementById('r_scan_agreement');
+                        // 1. OBSŁUGA NOWYCH PLIKÓW (MULTIPLE)
+                        const fileInput = document.getElementById('r_new_files');
+                        if (fileInput && fileInput.files.length > 0) {
+                            for (let i = 0; i < fileInput.files.length; i++) {
+                                // Appendujemy każdy plik pod tym samym kluczem 'new_files'
+                                // Django API potraktuje to jako listę
+                                formData.append('new_files', fileInput.files[i]);
+                            }
+                        }
 
-                    // 1. Czy wysyłamy nowy plik?
-                    if (fileInput && fileInput.files[0]) {
-                        formData.append('scan_agreement', fileInput.files[0]);
-                    }
+                        // 2. OBSŁUGA USUWANIA PLIKÓW
+                        // Szukamy wszystkich zaznaczonych checkboxów z klasą .remove-attachment-cb
+                        const checkboxes = document.querySelectorAll('.remove-attachment-cb:checked');
+                        checkboxes.forEach(cb => {
+                            formData.append('remove_attachment_ids', parseInt(cb.value));
+                        });
 
-                    // 2. Czy usuwamy stary plik?
-                    const removeCheckbox = document.getElementById('r_remove_scan');
-                    if (removeCheckbox && removeCheckbox.checked) {
-                        formData.append('remove_scan', 'true');
-                    }
-
-                    data = formData; // Przypisujemy FormData
+                        data = formData;
                 }
                 // 7. EDYCJA ISTNIEJĄCYCH (POLISY I SERWIS)
                 else if (currentRecordId) {
@@ -1556,18 +1562,28 @@
                     // --- OBSŁUGA KOLUMNY INFO (Notatka + Link do PDF) ---
                     let infoContent = '';
                     if (item.additional_info) {
-                        infoContent += `<div style="font-style:italic; color:#555;">${item.additional_info}</div>`;
+                        infoContent += `<div style="font-style:italic; color:#555; margin-bottom:4px;">${item.additional_info}</div>`;
                     }
-                    if (item.scan_agreement) {
-                        infoContent += `
-                            <div style="margin-top:4px;">
-                                <a href="${item.scan_agreement}" target="_blank"
-                                   style="color:#d9534f; font-weight:bold; text-decoration:none; display:flex; align-items:center; gap:4px;">
-                                   📄 Umowa (PDF)
+
+                    // Sprawdzamy, czy są załączniki w nowym modelu
+                    if (item.attachments && item.attachments.length > 0) {
+                        infoContent += `<div style="display:flex; flex-wrap:wrap; gap:5px;">`;
+                        item.attachments.forEach(att => {
+                            // Skrócona nazwa pliku (np. ostatnie 10 znaków) lub ikonka
+                            infoContent += `
+                                <a href="${att.file}" target="_blank" title="Pobierz plik"
+                                   style="text-decoration:none; background:#eee; padding:2px 6px; border-radius:4px; font-size:0.8em; color:#333; border:1px solid #ccc;">
+                                   📄 PDF
                                 </a>
-                            </div>
-                        `;
+                            `;
+                        });
+                        infoContent += `</div>`;
                     }
+                    else if (item.scan_agreement) {
+                        // Wsparcie dla starego pola (jeśli jeszcze jakieś dane tam zostały)
+                        infoContent += `<div><a href="${item.scan_agreement}" target="_blank" style="color:blue;">📄 Stary plik</a></div>`;
+                    }
+
                     if (!infoContent) infoContent = '<span style="color:#ccc;">-</span>';
                     // ----------------------------------------------------
 

@@ -285,3 +285,14 @@ class Reservation(models.Model):
         verbose_name = "Rezerwacja"
         verbose_name_plural = "Rezerwacje"
 
+class ReservationFile(models.Model):
+    reservation = models.ForeignKey(
+        Reservation,
+        on_delete=models.CASCADE,
+        related_name='attachments' # To pozwoli odwoływać się: rezerwacja.attachments.all()
+    )
+    file = models.FileField(upload_to='umowy/', verbose_name="Plik")
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Plik {self.id} dla rezerwacji {self.reservation_id}"
