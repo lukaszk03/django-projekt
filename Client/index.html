@@ -713,28 +713,26 @@
                 const sel = (val) => (record?.vehicle_type === val ? 'selected' : '');
                 const stSel = (val) => (record?.status === val ? 'selected' : '');
 
+                let fileHtml = '';
+                if (record && record.scan_agreement) {
+                    fileHtml = `
+                        <div style="margin-top: 5px; font-size: 0.9em; background: #e9ecef; padding: 5px; border-radius: 4px;">
+                            Aktualny plik: <a href="${record.scan_agreement}" target="_blank" style="color: blue; font-weight: bold;">Pobierz PDF</a>
+                        </div>
+                    `;
+                }
+
                 formHtml = `
-                    <label>Imię kierowcy:</label>
-                    <input type="text" id="r_first_name" value="${record?.first_name || ''}" required placeholder="np. Jan">
-
-                    <label>Nazwisko kierowcy:</label>
-                    <input type="text" id="r_last_name" value="${record?.last_name || ''}" required placeholder="np. Kowalski">
-
-                    <label>Nazwa Firmy:</label>
-                    <input type="text" id="r_company" value="${record?.company || ''}" required placeholder="Wpisz nazwę firmy">
+                    <label>Imię kierowcy:</label> <input type="text" id="r_first_name" value="${record?.first_name || ''}" required>
+                    <label>Nazwisko kierowcy:</label> <input type="text" id="r_last_name" value="${record?.last_name || ''}" required>
+                    <label>Nazwa Firmy:</label> <input type="text" id="r_company" value="${record?.company || ''}" required>
 
                     <div style="display:flex; gap:10px;">
-                        <div style="flex:1;">
-                            <label>Data Od:</label>
-                            <input type="date" id="r_date_from" value="${record?.date_from || ''}" required>
-                        </div>
-                        <div style="flex:1;">
-                            <label>Data Do:</label>
-                            <input type="date" id="r_date_to" value="${record?.date_to || ''}" required>
-                        </div>
+                        <div style="flex:1;"> <label>Data Od:</label> <input type="date" id="r_date_from" value="${record?.date_from || ''}" required> </div>
+                        <div style="flex:1;"> <label>Data Do:</label> <input type="date" id="r_date_to" value="${record?.date_to || ''}" required> </div>
                     </div>
 
-                    <label>Preferowany Typ pojazdu (Ogólny):</label>
+                    <label>Preferowany Typ:</label>
                     <select id="r_vehicle_type">
                         <option value="OSOBOWE" ${sel('OSOBOWE')}>Osobowe</option>
                         <option value="CIEZAROWE" ${sel('CIEZAROWE')}>Ciężarowe</option>
@@ -743,10 +741,8 @@
                         <option value="KOMBI" ${sel('KOMBI')}>Kombi</option>
                     </select>
 
-                    <label style="color: #007bff; font-weight: bold; margin-top: 10px;">Przypisz konkretny pojazd (z bazy):</label>
-                    <select id="r_assigned_vehicle" style="border: 1px solid #007bff; background-color: #f0f8ff;">
-                        ${vehicleOptions}
-                    </select>
+                    <label style="color: #007bff; font-weight:bold; margin-top:10px;">Przypisz pojazd:</label>
+                    <select id="r_assigned_vehicle" style="border: 1px solid #007bff; background:#f0f8ff;"> ${vehicleOptions} </select>
 
                     <label>Status:</label>
                     <select id="r_status">
@@ -756,8 +752,12 @@
                         <option value="ODRZUCONE" ${stSel('ODRZUCONE')}>Odrzucone</option>
                     </select>
 
-                    <label style="margin-top: 10px;">Dodatkowe informacje (dla kierowcy):</label>
-                    <textarea id="r_additional_info" rows="3" placeholder="Np. Pojazd czeka na parkingu B, kluczyki w recepcji...">${record?.additional_info || ''}</textarea>
+                    <label style="margin-top: 10px;">Dodatkowe informacje:</label>
+                    <textarea id="r_additional_info" rows="2">${record?.additional_info || ''}</textarea>
+
+                    <label style="margin-top: 10px; font-weight:bold;">Skan Umowy / Dokument (PDF):</label>
+                    <input type="file" id="r_scan_agreement" accept="application/pdf,image/*">
+                    ${fileHtml}
                 `;
             }
             // 7. EDYCJA ISTNIEJĄCYCH ZDARZEŃ (POLISY, BADANIA, NAPRAWY)
@@ -811,8 +811,8 @@
             console.log(`Próba zapisu: ${method} na ${url} (Widok: ${currentView})`);
 
             try {
+                // 1. DODAWANIE NOWEGO TERMINU (KALENDARZ)
                 if (eventTypeSelector && !currentRecordId) {
-                    // DODAWANIE NOWEGO TERMINU (BEZ ZMIAN)
                     const selectedType = eventTypeSelector.value;
                     const pojazdId = document.getElementById('pojazd_id_selector').value;
                     const dataTerminu = document.getElementById('data_terminu').value;
@@ -839,7 +839,7 @@
                     url = `${API_BASE}${endpoint}/`;
                     method = 'POST';
                 }
-                // POJAZDY
+                // 2. POJAZDY
                 else if (currentView === 'vehicles') {
                     data = {
                         registration_number: document.getElementById('reg_num').value,
@@ -857,7 +857,7 @@
                         uwagi: document.getElementById('v_uwagi').value || null
                     };
                 }
-                // SZKODY
+                // 3. SZKODY
                 else if (currentView === 'damages') {
                     data = {
                         pojazd: parseInt(document.getElementById('pojazd_id').value),
@@ -867,7 +867,7 @@
                         szacowany_koszt: 0
                     };
                 }
-                // KIEROWCY
+                // 4. KIEROWCY
                 else if (currentView === 'drivers') {
                     const userIdInput = document.getElementById('d_user_id');
                     const userId = userIdInput ? userIdInput.value : null;
@@ -882,7 +882,7 @@
                         data_waznosci_badan: document.getElementById('data_badan_val').value || null
                     };
                 }
-                // PRZEKAZANIA
+                // 5. PRZEKAZANIA
                 else if (currentView === 'handover') {
                     data = {
                         pojazd: parseInt(document.getElementById('h_pojazd_id').value),
@@ -892,27 +892,32 @@
                         uwagi: document.getElementById('h_uwagi').value
                     };
                 }
+                // 6. REZERWACJE (Poprawiona logika FormData)
                 else if (currentView === 'reservations') {
-                    const assignedVehicleVal = document.getElementById('r_assigned_vehicle').value;
-                    data = {
-                        first_name: document.getElementById('r_first_name').value,
-                        last_name: document.getElementById('r_last_name').value,
-                        company: document.getElementById('r_company').value,
+                    const formData = new FormData();
 
-                        // ZMIANA: Pobieramy dwie daty
-                        date_from: document.getElementById('r_date_from').value,
-                        date_to: document.getElementById('r_date_to').value,
+                    formData.append('first_name', document.getElementById('r_first_name').value);
+                    formData.append('last_name', document.getElementById('r_last_name').value);
+                    formData.append('company', document.getElementById('r_company').value);
+                    formData.append('date_from', document.getElementById('r_date_from').value);
+                    formData.append('date_to', document.getElementById('r_date_to').value);
+                    formData.append('vehicle_type', document.getElementById('r_vehicle_type').value);
+                    formData.append('status', document.getElementById('r_status').value);
+                    formData.append('additional_info', document.getElementById('r_additional_info').value);
 
-                        vehicle_type: document.getElementById('r_vehicle_type').value,
+                    const assignedVal = document.getElementById('r_assigned_vehicle').value;
+                    if (assignedVal) {
+                        formData.append('assigned_vehicle', parseInt(assignedVal));
+                    }
 
-                        assigned_vehicle: assignedVehicleVal ? parseInt(assignedVehicleVal) : null,
-                        status: document.getElementById('r_status').value,
+                    const fileInput = document.getElementById('r_scan_agreement');
+                    if (fileInput && fileInput.files[0]) {
+                        formData.append('scan_agreement', fileInput.files[0]);
+                    }
 
-                        additional_info: document.getElementById('r_additional_info').value
-                    };
+                    data = formData; // Przypisujemy FormData
                 }
-                // --- EDYCJA ISTNIEJĄCYCH (POLISY I SERWIS) ---
-                // TUTAJ POPRAWIAMY LOGIKĘ!
+                // 7. EDYCJA ISTNIEJĄCYCH (POLISY I SERWIS)
                 else if (currentRecordId) {
                     const resolvedEndpoint = endpointMap[currentView] || currentView;
 
@@ -922,23 +927,31 @@
                             opis: document.getElementById('opis_serwisu').value,
                             koszt: parseFloat(document.getElementById('koszt_val').value) || 0,
                             data_serwisu: document.getElementById('data_serwisu_val').value,
-                            typ_zdarzenia: document.getElementById('typ_zdarzenia_val').value // Pobieramy z ukrytego pola
+                            typ_zdarzenia: document.getElementById('typ_zdarzenia_val').value
                         };
                     } else if (resolvedEndpoint === 'policies') {
                         data = {
                             pojazd: parseInt(document.getElementById('pojazd_id').value),
                             numer_polisy: document.getElementById('numer_polisy').value,
-                            ubezpieczyciel: document.getElementById('ubezpieczyciel_val').value, // TO BYŁO BRAKUJĄCE
+                            ubezpieczyciel: document.getElementById('ubezpieczyciel_val').value,
                             data_waznosci_oc: document.getElementById('data_waznosci_oc').value,
                             data_waznosci_ac: document.getElementById('data_waznosci_ac').value || null
                         };
                     }
                 }
 
+                // --- WYSYŁANIE ŻĄDANIA ---
+                const headers = getAuthHeaders();
+
+                // WAŻNE: Jeśli wysyłamy FormData (plik), usuwamy Content-Type (przeglądarka ustawi go sama)
+                if (data instanceof FormData) {
+                    delete headers['Content-Type'];
+                }
+
                 const response = await fetch(url, {
                     method: method,
-                    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
+                    headers: headers,
+                    body: (data instanceof FormData) ? data : JSON.stringify(data)
                 });
 
                 if (response.status === 401) { handleLogout(); return; }
@@ -1457,8 +1470,7 @@
             currentView = 'reservations';
             viewTitle.textContent = 'Rezerwacje Pojazdów';
 
-            // ZMIANA GRIDU: Dodajemy kolumnę "Info" (1fr - zajmie resztę miejsca)
-            // Lp, Imię, Nazwisko, Firma, Typ, Pojazd, Termin, Status, INFO, Akcje
+            // Grid: Lp, Imię, Nazwisko, Firma, Typ, Pojazd, Termin, Status, INFO, Akcje
             const gridLayout = "40px 100px 100px 120px 100px 120px 140px 130px 1fr 100px";
 
             mainContent.innerHTML = `
@@ -1471,7 +1483,8 @@
                     <div>Pojazd</div>
                     <div>Termin</div>
                     <div>Status</div>
-                    <div>Info</div> <div style="text-align: center;">Akcje</div>
+                    <div>Info</div>
+                    <div style="text-align: center;">Akcje</div>
                 </div>
                 <div id="data-list">Ładowanie rezerwacji...</div>
             `;
@@ -1518,10 +1531,23 @@
                         pojazdHtml = `<strong style="color: #007bff;">${item.assigned_vehicle_display}</strong>`;
                     }
 
-                    // Obsługa wyświetlania notatki
-                    const infoText = item.additional_info
-                        ? `<span title="${item.additional_info}" style="cursor:help; color:#555; font-style:italic;">${item.additional_info}</span>`
-                        : '<span style="color:#ccc;">-</span>';
+                    // --- OBSŁUGA KOLUMNY INFO (Notatka + Link do PDF) ---
+                    let infoContent = '';
+                    if (item.additional_info) {
+                        infoContent += `<div style="font-style:italic; color:#555;">${item.additional_info}</div>`;
+                    }
+                    if (item.scan_agreement) {
+                        infoContent += `
+                            <div style="margin-top:4px;">
+                                <a href="${item.scan_agreement}" target="_blank"
+                                   style="color:#d9534f; font-weight:bold; text-decoration:none; display:flex; align-items:center; gap:4px;">
+                                   📄 Umowa (PDF)
+                                </a>
+                            </div>
+                        `;
+                    }
+                    if (!infoContent) infoContent = '<span style="color:#ccc;">-</span>';
+                    // ----------------------------------------------------
 
                     row.innerHTML = `
                         <div>${index + 1}.</div>
@@ -1536,7 +1562,7 @@
                                 ${item.status}
                             </span>
                         </div>
-                        <div style="font-size: 0.85em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${infoText}</div>
+                        <div style="font-size: 0.85em; overflow: hidden;">${infoContent}</div>
 
                         <div style="text-align: center;">${getActionButtons(item, 'reservations')}</div>
                     `;

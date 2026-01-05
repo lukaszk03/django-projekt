@@ -255,6 +255,13 @@ class Reservation(models.Model):
         blank=True
     )
 
+    scan_agreement = models.FileField(
+        upload_to='umowy/',  # Pliki trafią do folderu media/umowy/
+        verbose_name="Skan Umowy (PDF)",
+        null=True,
+        blank=True
+    )
+
     # NOWE POLE: STATUS
     STATUS_CHOICES = [
         ('OCZEKUJACE', 'Oczekujące'),
