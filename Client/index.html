@@ -715,12 +715,25 @@
 
                 let fileHtml = '';
                 if (record && record.scan_agreement) {
+                    // Jeśli plik istnieje, pokazujemy link ORAZ opcję usunięcia
                     fileHtml = `
-                        <div style="margin-top: 5px; font-size: 0.9em; background: #e9ecef; padding: 5px; border-radius: 4px;">
-                            Aktualny plik: <a href="${record.scan_agreement}" target="_blank" style="color: blue; font-weight: bold;">Pobierz PDF</a>
+                        <div style="margin-top: 5px; background: #e9ecef; padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
+                            <div style="margin-bottom: 5px;">
+                                Aktualny plik: <a href="${record.scan_agreement}" target="_blank" style="color: blue; font-weight: bold;">Pobierz PDF</a>
+                            </div>
+                            <div style="border-top: 1px solid #ccc; padding-top: 5px;">
+                                <input type="checkbox" id="r_remove_scan" style="width: auto; margin-right: 5px;">
+                                <label for="r_remove_scan" style="color: #dc3545; cursor: pointer; font-weight: bold;">Usuń ten załącznik</label>
+                            </div>
                         </div>
                     `;
                 }
+
+                formHtml = `
+                    <label style="margin-top: 10px; font-weight:bold;">Skan Umowy / Dokument (PDF):</label>
+                    <input type="file" id="r_scan_agreement" accept="application/pdf,image/*">
+                    ${fileHtml}
+                `;
 
                 formHtml = `
                     <label>Imię kierowcy:</label> <input type="text" id="r_first_name" value="${record?.first_name || ''}" required>
@@ -910,9 +923,18 @@
                         formData.append('assigned_vehicle', parseInt(assignedVal));
                     }
 
+                    // --- OBSŁUGA PLIKÓW I USUWANIA ---
                     const fileInput = document.getElementById('r_scan_agreement');
+
+                    // 1. Czy wysyłamy nowy plik?
                     if (fileInput && fileInput.files[0]) {
                         formData.append('scan_agreement', fileInput.files[0]);
+                    }
+
+                    // 2. Czy usuwamy stary plik?
+                    const removeCheckbox = document.getElementById('r_remove_scan');
+                    if (removeCheckbox && removeCheckbox.checked) {
+                        formData.append('remove_scan', 'true');
                     }
 
                     data = formData; // Przypisujemy FormData

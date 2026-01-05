@@ -85,6 +85,21 @@ class ServiceEventDto(serializers.ModelSerializer):
 class ReservationDto(serializers.ModelSerializer):
     assigned_vehicle_display = serializers.ReadOnlyField(source='assigned_vehicle.registration_number')
 
+    remove_scan = serializers.BooleanField(write_only=True, required=False)
+
     class Meta:
         model = Reservation
-        fields = ['id', 'first_name', 'last_name', 'company', 'date_from', 'date_to', 'vehicle_type', 'status', 'created_at', 'assigned_vehicle', 'assigned_vehicle_display', 'additional_info', 'scan_agreement']
+        fields = ['id', 'first_name', 'last_name', 'company', 'date_from', 'date_to', 'vehicle_type', 'status', 'created_at', 'assigned_vehicle', 'assigned_vehicle_display', 'additional_info', 'scan_agreement', 'remove_scan']
+
+    def update(self, instance, validated_data):
+        # Sprawdzamy, czy przesłano flagę usunięcia
+        remove_scan = validated_data.pop('remove_scan', False)
+
+        if remove_scan:
+            # Jeśli jest plik, usuwamy go fizycznie i czyścimy pole
+            if instance.scan_agreement:
+                instance.scan_agreement.delete(save=False)
+                instance.scan_agreement = None
+
+        # Wykonujemy standardową aktualizację reszty pól
+        return super().update(instance, validated_data)
