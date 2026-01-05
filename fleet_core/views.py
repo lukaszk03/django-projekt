@@ -10,10 +10,10 @@ from rest_framework_simplejwt.tokens import RefreshToken  # Do generowania token
 
 # Usunięto błędny import 'User' - używamy tylko CustomUser z .models
 # DODANO: ServiceEventDto do listy importów
-from .serializers import VehicleDto, DriverDto, DamageEventDto, InsurancePolicyDto, VehicleHandoverDto, ServiceEventDto
+from .serializers import VehicleDto, DriverDto, DamageEventDto, InsurancePolicyDto, VehicleHandoverDto, ServiceEventDto, ReservationDto
 
 # DODANO: ServiceEvent do listy importów
-from .models import Vehicle, Driver, DamageEvent, InsurancePolicy, CustomUser, VehicleHandover, ServiceEvent
+from .models import Vehicle, Driver, DamageEvent, InsurancePolicy, CustomUser, VehicleHandover, ServiceEvent, Reservation
 
 # ----------------------------------------------------
 # WIDOKI DLA ZARZĄDZANIA DANYMI FLOTY (Fleet Data ViewSets)
@@ -127,3 +127,9 @@ def register_view(request):
     )
 
     return Response({'detail': 'Konto zostało utworzone. Możesz się zalogować.'}, status=status.HTTP_201_CREATED)
+
+# 7. NOWY WIDOK DLA REZERWACJI
+class ReservationViewSet(viewsets.ModelViewSet):
+    # POPRAWKA: Usunięto select_related('company'), bo 'company' to teraz tekst, a nie klucz obcy!
+    queryset = Reservation.objects.all().order_by('-created_at')
+    serializer_class = ReservationDto

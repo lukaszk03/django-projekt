@@ -1,7 +1,7 @@
 # Master/Server/fleet_core/serializers.py
 
 from rest_framework import serializers
-from .models import Vehicle, Driver, ServiceEvent, DamageEvent, FleetCompany, InsurancePolicy, VehicleHandover
+from .models import Vehicle, Driver, ServiceEvent, DamageEvent, FleetCompany, InsurancePolicy, VehicleHandover, Reservation
 
 # 1. SERIALIZER DLA POJAZDÓW
 class VehicleDto(serializers.ModelSerializer):
@@ -80,3 +80,10 @@ class ServiceEventDto(serializers.ModelSerializer):
     class Meta:
         model = ServiceEvent
         fields = ['id', 'pojazd', 'pojazd_nr_rej', 'pojazd_vin', 'opis', 'data_serwisu', 'koszt', 'typ_zdarzenia']
+
+# 7. REZERWACJE (NOWE)
+class ReservationDto(serializers.ModelSerializer):
+
+    class Meta:
+        model = Reservation
+        fields = ['id', 'first_name', 'last_name', 'company', 'company', 'reservation_date', 'vehicle_type', 'status', 'created_at']

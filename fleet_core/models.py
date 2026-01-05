@@ -220,3 +220,45 @@ class VehicleHandover(models.Model):
 
     def __str__(self):
         return f"{self.pojazd} -> {self.kierowca} ({self.data_wydania})"
+
+
+# ----------------------------------------------------
+# MODEL REZERWACJI (NOWE)
+# ----------------------------------------------------
+class Reservation(models.Model):
+    first_name = models.CharField(max_length=100, verbose_name="Imię Kierowcy")
+    last_name = models.CharField(max_length=100, verbose_name="Nazwisko Kierowcy")
+
+    # ZMIANA: Zamiast ForeignKey, zwykłe pole tekstowe
+    company = models.CharField(max_length=200, verbose_name="Nazwa Firmy")
+
+    reservation_date = models.DateField(verbose_name="Data Rezerwacji")
+
+    vehicle_type = models.CharField(
+        max_length=30,
+        choices=Vehicle.TYPE_CHOICES,
+        verbose_name="Typ Pojazdu"
+    )
+
+    # NOWE POLE: STATUS
+    STATUS_CHOICES = [
+        ('OCZEKUJACE', 'Oczekujące'),
+        ('PRZYJETE', 'Przyjęte'),
+        ('ZATWIERDZONE', 'Zatwierdzone'),
+        ('ODRZUCONE', 'Odrzucone'),
+    ]
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='OCZEKUJACE',
+        verbose_name="Status Rezerwacji"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Rezerwacja: {self.first_name} {self.last_name} ({self.status})"
+
+    class Meta:
+        verbose_name = "Rezerwacja"
+        verbose_name_plural = "Rezerwacje"

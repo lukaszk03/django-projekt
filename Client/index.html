@@ -283,6 +283,7 @@
                 <div class="menu-item" data-view="leasing">🧾 Leasingi</div>
                 <div class="menu-item" data-view="hr_docs">📄 Dokumenty kadrowe</div>
                 <div class="menu-item" data-view="settlements">💶 Rozliczenia</div>
+                <div class="menu-item" data-view="reservations">📝 Rezerwacje</div>
                 <div class="menu-item" data-view="other">🕒 Pozostałe</div>
 
                 <div class="menu-item" data-view="settings" style="margin-top: 30px;">⚙️ Ustawienia</div>
@@ -520,6 +521,7 @@
             'tech_inspections': 'service_events',
             'legalization': 'service_events',
             'policies': 'policies',
+            'reservations': 'reservations',
             'calendar': null
         };
 
@@ -567,7 +569,7 @@
 
 
         /** Otwiera modal i ładuje odpowiedni formularz */
-        async function openModal(viewName, recordOrId = null) {
+       async function openModal(viewName, recordOrId = null) {
             let record = null;
             modalError.textContent = '';
             modalForm.innerHTML = 'Ładowanie danych...';
@@ -604,7 +606,7 @@
             let formHtml = '';
             const isCalendarEventView = ['calendar', 'policies', 'tech_inspections', 'reviews', 'repairs', 'legalization', 'inspection'].includes(viewName);
 
-            // 1. DODAWANIE NOWEGO TERMINU (BEZ ZMIAN)
+            // 1. DODAWANIE NOWEGO TERMINU (DLA WIDOKÓW KALENDARZOWYCH)
             if (isCalendarEventView && !currentRecordId) {
                 modalTitle.textContent = `Dodaj Nowy Termin/Zdarzenie`;
                 const vehicles = await fetchVehicles();
@@ -626,7 +628,7 @@
                     <input type="date" id="data_terminu" required>
                 `;
             }
-            // 2. POJAZDY (BEZ ZMIAN)
+            // 2. POJAZDY
             else if (viewName === 'vehicles') {
                 const sel = (f, v) => (record && record[f] === v) ? 'selected' : '';
                 formHtml = `
@@ -657,7 +659,7 @@
                     <label>Uwagi:</label><textarea id="v_uwagi">${record?.uwagi || ''}</textarea>
                 `;
             }
-            // 3. KIEROWCY (BEZ ZMIAN)
+            // 3. KIEROWCY
             else if (viewName === 'drivers') {
                 formHtml = `
                     <label>User ID:</label><input type="number" id="d_user_id" value="${record?.user || ''}" ${currentRecordId ? 'disabled' : ''}>
@@ -668,7 +670,7 @@
                     <label>Badania lek:</label><input type="date" id="data_badan_val" value="${record?.data_waznosci_badan || ''}">
                 `;
             }
-            // 4. PRZEKAZANIA (BEZ ZMIAN)
+            // 4. PRZEKAZANIA
             else if (viewName === 'handover') {
                 formHtml = `
                     <label>ID Pojazdu:</label><input type="number" id="h_pojazd_id" value="${record?.pojazd || ''}" required>
@@ -678,7 +680,7 @@
                     <label>Uwagi:</label><textarea id="h_uwagi">${record?.uwagi || ''}</textarea>
                 `;
             }
-            // 5. SZKODY (BEZ ZMIAN)
+            // 5. SZKODY
             else if (viewName === 'damages') {
                 const sel = (val) => (record?.status_naprawy === val ? 'selected' : '');
                 formHtml = `
@@ -693,42 +695,66 @@
                     <label>Opis:</label><textarea id="opis_szkody">${record?.opis || ''}</textarea>
                 `;
             }
-            // 6. --- EDYCJA ZDARZEŃ (POLISY, BADANIA, NAPRAWY) ---
-            // TUTAJ BYŁ BŁĄD! Teraz naprawiamy.
+            // 6. REZERWACJE (NAPRAWIONE - PRZENIESIONE NA GŁÓWNY POZIOM)
+            else if (viewName === 'reservations') {
+                const sel = (val) => (record?.vehicle_type === val ? 'selected' : '');
+                const stSel = (val) => (record?.status === val ? 'selected' : ''); // Helper do statusu
+
+                formHtml = `
+                    <label>Imię kierowcy:</label>
+                    <input type="text" id="r_first_name" value="${record?.first_name || ''}" required placeholder="np. Jan">
+
+                    <label>Nazwisko kierowcy:</label>
+                    <input type="text" id="r_last_name" value="${record?.last_name || ''}" required placeholder="np. Kowalski">
+
+                    <label>Nazwa Firmy:</label> <input type="text" id="r_company" value="${record?.company || ''}" required placeholder="Wpisz nazwę firmy">
+
+                    <label>Data Rezerwacji:</label>
+                    <input type="date" id="r_date" value="${record?.reservation_date || ''}" required>
+
+                    <label>Typ pojazdu:</label>
+                    <select id="r_vehicle_type">
+                        <option value="OSOBOWE" ${sel('OSOBOWE')}>Osobowe</option>
+                        <option value="CIEZAROWE" ${sel('CIEZAROWE')}>Ciężarowe</option>
+                        <option value="AUTOBUSY" ${sel('AUTOBUSY')}>Autobusy</option>
+                        <option value="SUV" ${sel('SUV')}>SUV</option>
+                        <option value="KOMBI" ${sel('KOMBI')}>Kombi</option>
+                    </select>
+
+                    <label>Status:</label>
+                    <select id="r_status">
+                        <option value="OCZEKUJACE" ${stSel('OCZEKUJACE')}>Oczekujące</option>
+                        <option value="PRZYJETE" ${stSel('PRZYJETE')}>Przyjęte</option>
+                        <option value="ZATWIERDZONE" ${stSel('ZATWIERDZONE')}>Zatwierdzone</option>
+                        <option value="ODRZUCONE" ${stSel('ODRZUCONE')}>Odrzucone</option>
+                    </select>
+                `;
+            }
+            // 7. EDYCJA ISTNIEJĄCYCH ZDARZEŃ (POLISY, BADANIA, NAPRAWY)
             else if (isCalendarEventView && currentRecordId) {
                  const endpointForType = endpointMap[viewName];
 
                  if (endpointForType === 'service_events') {
-                      // Dla Badań tech, Napraw, Przeglądów
                       formHtml = `
                         <input type="hidden" id="typ_zdarzenia_val" value="${record.typ_zdarzenia}">
-
                         <label>ID Pojazdu:</label>
                         <input type="number" id="pojazd_id" value="${record.pojazd}" required>
-
                         <label>Opis:</label>
                         <textarea id="opis_serwisu" required>${record.opis}</textarea>
-
                         <label>Koszt (PLN):</label>
                         <input type="number" id="koszt_val" step="0.01" value="${record.koszt}" required>
-
                         <label>Data Zdarzenia/Badania:</label>
                         <input type="date" id="data_serwisu_val" value="${record.data_serwisu}" required>
                     `;
                  } else if (endpointForType === 'policies') {
-                      // Dla Polis - DODANO BRAKUJĄCY UBEZPIECZYCIEL
                       formHtml = `
                             <label>ID Pojazdu:</label>
                             <input type="number" id="pojazd_id" value="${record.pojazd}" required>
-
                             <label>Numer Polisy:</label>
                             <input type="text" id="numer_polisy" value="${record.numer_polisy}" required>
-
                             <label>Ubezpieczyciel:</label> <input type="text" id="ubezpieczyciel_val" value="${record.ubezpieczyciel || ''}" required>
-
                             <label>Data Ważności OC:</label>
                             <input type="date" id="data_waznosci_oc" value="${record.data_waznosci_oc}" required>
-
                             <label>Data Ważności AC:</label>
                             <input type="date" id="data_waznosci_ac" value="${record.data_waznosci_ac || ''}">
                         `;
@@ -834,6 +860,21 @@
                         data_wydania: document.getElementById('h_data_wydania').value,
                         data_zwrotu: document.getElementById('h_data_zwrotu').value || null,
                         uwagi: document.getElementById('h_uwagi').value
+                    };
+                }
+                else if (currentView === 'reservations') {
+                    data = {
+                        first_name: document.getElementById('r_first_name').value,
+                        last_name: document.getElementById('r_last_name').value,
+
+                        // ZMIANA: Pobieramy tekst, a nie liczbę!
+                        company: document.getElementById('r_company').value,
+
+                        reservation_date: document.getElementById('r_date').value,
+                        vehicle_type: document.getElementById('r_vehicle_type').value,
+
+                        // NOWE: Pobieramy status
+                        status: document.getElementById('r_status').value
                     };
                 }
                 // --- EDYCJA ISTNIEJĄCYCH (POLISY I SERWIS) ---
@@ -1375,6 +1416,84 @@
             }
         }
 
+        async function renderReservations() {
+            const mainContent = document.getElementById('main-content');
+            if (!mainContent) return;
+
+            currentView = 'reservations';
+            viewTitle.textContent = 'Rezerwacje Pojazdów';
+
+            // Grid: Lp, Imię, Nazwisko, Firma, Typ Auta, Data, Status, Akcje
+            const gridLayout = "40px 1fr 1fr 1.5fr 120px 110px 130px 100px";
+
+            mainContent.innerHTML = `
+                <div class="table-header-sm" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; font-weight: bold; padding: 10px; background: #ebedef; border-bottom: 2px solid #ccc; align-items: center;">
+                    <div>Lp.</div>
+                    <div>Imię</div>
+                    <div>Nazwisko</div>
+                    <div>Firma</div>
+                    <div>Typ Auta</div>
+                    <div>Na kiedy?</div>
+                    <div>Status</div> <div style="text-align: center;">Akcje</div>
+                </div>
+                <div id="data-list">Ładowanie rezerwacji...</div>
+            `;
+
+            const dataList = document.getElementById('data-list');
+
+            try {
+                const response = await fetch(API_BASE + 'reservations/', { headers: getAuthHeaders() });
+                if (response.status === 401) { handleLogout(); return; }
+
+                const data = await response.json();
+                dataList.innerHTML = '';
+
+                if (data.length === 0) {
+                    dataList.innerHTML = '<div style="padding: 20px;">Brak rezerwacji. Kliknij DODAJ, aby złożyć zamówienie.</div>';
+                    return;
+                }
+
+                data.forEach((item, index) => {
+                    const row = document.createElement('div');
+                    row.className = 'table-row-sm';
+                    row.style.display = 'grid';
+                    row.style.gridTemplateColumns = gridLayout;
+                    row.style.gap = '10px';
+                    row.style.padding = '10px';
+                    row.style.borderBottom = '1px solid #eee';
+                    row.style.alignItems = 'center';
+
+                    // Kolory statusów
+                    let statusColor = '#333';
+                    let statusBg = '#f0f0f0';
+                    if (item.status === 'OCZEKUJACE') { statusColor = '#856404'; statusBg = '#fff3cd'; } // Żółty
+                    if (item.status === 'PRZYJETE') { statusColor = '#004085'; statusBg = '#cce5ff'; } // Niebieski
+                    if (item.status === 'ZATWIERDZONE') { statusColor = '#155724'; statusBg = '#d4edda'; } // Zielony
+                    if (item.status === 'ODRZUCONE') { statusColor = '#721c24'; statusBg = '#f8d7da'; } // Czerwony
+
+                    row.innerHTML = `
+                        <div>${index + 1}.</div>
+                        <div>${item.first_name}</div>
+                        <div style="font-weight: bold;">${item.last_name}</div>
+                        <div>${item.company}</div>
+                        <div><span class="badge" style="background:#e6f7ff; padding: 3px 6px; border-radius:4px;">${item.vehicle_type}</span></div>
+                        <div>${item.reservation_date}</div>
+
+                        <div>
+                            <span style="background-color: ${statusBg}; color: ${statusColor}; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85em;">
+                                ${item.status}
+                            </span>
+                        </div>
+
+                        <div style="text-align: center;">${getActionButtons(item, 'reservations')}</div>
+                    `;
+                    dataList.appendChild(row);
+                });
+            } catch (error) {
+                dataList.innerHTML = `<div class="error">Błąd: ${error.message}</div>`;
+            }
+        }
+
         async function renderDamageEvents() {
             viewTitle.textContent = 'Zdarzenia Szkodowe i Awarie';
             const token = localStorage.getItem('access_token');
@@ -1624,6 +1743,7 @@
             'handover': renderHandovers,
             'calendar': renderCalendar,
             'policies': renderPolicies,
+            'reservations': renderReservations,
 
             // --- NAPRAWIONE ZAKŁADKI SERWISOWE ---
             // Teraz wywołują funkcję renderServiceEvents z odpowiednim filtrem
