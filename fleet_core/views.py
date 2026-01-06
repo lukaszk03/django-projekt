@@ -2,7 +2,7 @@
 
 from rest_framework import viewsets, permissions
 # Importy dla tokenów JWT i API
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth import authenticate  # Do weryfikacji hasła
@@ -23,6 +23,77 @@ from .models import Vehicle, Driver, DamageEvent, InsurancePolicy, CustomUser, V
 class VehicleViewSet(viewsets.ModelViewSet):
     queryset = Vehicle.objects.select_related('company').all()
     serializer_class = VehicleDto
+
+    @action(detail=True, methods=['get'])
+    def history(self, request, pk=None):
+        vehicle = self.get_object()
+        events = []
+
+        # 1. Przekazania (Kto i kiedy jeździł)
+        for h in vehicle.handovers.all():
+            kierowca = f"{h.kierowca.user.first_name} {h.kierowca.user.last_name}"
+            # Ustalamy datę końca (jeśli jest w trakcie, bierzemy dzisiejszą dla sortowania lub null)
+            desc = f"Kierowca: {kierowca} ({h.kierowca.company.nazwa if h.kierowca.company else 'Brak firmy'})."
+            if h.uwagi:
+                desc += f" Uwagi: {h.uwagi}"
+
+            events.append({
+                'date': h.data_wydania,
+                'type': 'HANDOVER',
+                'title': 'Wydanie Pojazdu',
+                'description': desc,
+                'icon': 'fa-key',
+                'color': '#28a745'  # Zielony
+            })
+
+            # Jeśli auto zostało zwrócone, dodajemy osobny wpis o zwrocie
+            if h.data_zwrotu:
+                events.append({
+                    'date': h.data_zwrotu,
+                    'type': 'RETURN',
+                    'title': 'Zwrot Pojazdu',
+                    'description': f"Zwrot od: {kierowca}. Przebieg: {h.przebieg_stop or '-'} km.",
+                    'icon': 'fa-check-circle',
+                    'color': '#17a2b8'  # Niebieski
+                })
+
+        # 2. Szkody
+        for d in vehicle.damage_history.all():
+            events.append({
+                'date': d.data_zdarzenia,
+                'type': 'DAMAGE',
+                'title': f'Szkoda: {d.status_naprawy}',
+                'description': d.opis,
+                'icon': 'fa-car-crash',
+                'color': '#dc3545'  # Czerwony
+            })
+
+        # 3. Serwisy / Przeglądy
+        for s in vehicle.service_history.all():
+            events.append({
+                'date': s.data_serwisu,
+                'type': 'SERVICE',
+                'title': f"Serwis: {s.get_typ_zdarzenia_display()}",
+                'description': f"{s.opis} (Koszt: {s.koszt} PLN)",
+                'icon': 'fa-wrench',
+                'color': '#ffc107'  # Żółty
+            })
+
+        # 4. Polisy (Data ważności OC jako zdarzenie)
+        for p in vehicle.policies.all():
+            events.append({
+                'date': p.data_waznosci_oc,
+                'type': 'POLICY',
+                'title': f"Koniec Polisy OC ({p.ubezpieczyciel})",
+                'description': f"Nr polisy: {p.numer_polisy}",
+                'icon': 'fa-file-contract',
+                'color': '#6c757d'  # Szary
+            })
+
+        # Sortowanie po dacie (od najnowszych)
+        events.sort(key=lambda x: x['date'], reverse=True)
+
+        return Response(events)
 
 # 2. WIDOK DLA UŻYTKOWNIKÓW (Kierowców)
 class DriverViewSet(viewsets.ModelViewSet):

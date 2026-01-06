@@ -301,6 +301,23 @@
 
         .show-dropdown { display: block; }
 
+        .vehicle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; padding: 20px; }
+        .vehicle-card { background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; text-align: center; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; border-top: 4px solid #007bff; }
+        .vehicle-card:hover { transform: translateY(-5px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .vehicle-card h3 { margin: 0 0 10px 0; color: #333; }
+        .vehicle-card p { margin: 5px 0; color: #666; font-size: 0.9em; }
+
+        .timeline-container { max-width: 800px; margin: 0 auto; position: relative; padding: 20px 0; }
+        .timeline-container::after { content: ''; position: absolute; width: 4px; background-color: #e9ecef; top: 0; bottom: 0; left: 50px; margin-left: -2px; }
+
+        .timeline-item { padding: 10px 40px; position: relative; background-color: inherit; width: 100%; box-sizing: border-box; }
+        .timeline-icon { position: absolute; left: 34px; width: 32px; height: 32px; right: auto; top: 15px; border-radius: 50%; z-index: 1; color: white; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 4px white; }
+        .timeline-date { position: absolute; left: -80px; top: 18px; width: 120px; text-align: right; font-weight: bold; color: #555; font-size: 0.85em; }
+
+        .timeline-content { padding: 15px; background-color: white; position: relative; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-left: 60px; border-left: 4px solid #ccc; }
+        .timeline-content h4 { margin: 0 0 5px 0; font-size: 1.1em; }
+        .timeline-content p { margin: 0; font-size: 0.9em; color: #666; }
+
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -377,8 +394,8 @@
             <div class="menu-item" data-view="reservations">
                 <i class="fas fa-calendar-check"></i> <span>Rezerwacje</span>
             </div>
-            <div class="menu-item" data-view="other">
-                <i class="fas fa-ellipsis-h"></i> <span>Pozostałe</span>
+            <div class="menu-item" data-view="vehicle_history">
+                <i class="fas fa-history"></i> <span>Historia Pojazdu</span>
             </div>
 
             <div style="margin-top: auto;"> <div class="menu-item" data-view="settings" style="border-top: 1px solid #34495e;">
@@ -1899,6 +1916,101 @@
             }
         }
 
+        async function renderVehicleHistory(selectedVehicleId = null) {
+            const contentDiv = document.getElementById('main-content');
+            currentView = 'vehicle_history';
+
+            // 1. WIDOK WYBORU POJAZDU (KAFELKI)
+            if (!selectedVehicleId) {
+                viewTitle.textContent = 'Historia Pojazdu - Wybierz Samochód';
+                contentDiv.innerHTML = '<div id="v-grid" class="vehicle-grid">Ładowanie...</div>';
+
+                // Ukrywamy przycisk DODAJ, bo tu tylko przeglądamy
+                document.getElementById('add-btn').style.display = 'none';
+
+                try {
+                    const response = await fetch(API_BASE + 'vehicles/', { headers: getAuthHeaders() });
+                    const vehicles = await response.json();
+
+                    const grid = document.getElementById('v-grid');
+                    grid.innerHTML = '';
+
+                    if(vehicles.length === 0) {
+                        grid.innerHTML = 'Brak pojazdów w bazie.';
+                        return;
+                    }
+
+                    vehicles.forEach(v => {
+                        const card = document.createElement('div');
+                        card.className = 'vehicle-card';
+                        card.innerHTML = `
+                            <h3>${v.registration_number}</h3>
+                            <p style="font-weight:bold; font-size:1.1em;">${v.marka} ${v.model}</p>
+                            <p>${v.vin}</p>
+                            <p style="color:${v.status==='SPRAWNY'?'green':'red'}">${v.status}</p>
+                            <button style="margin-top:10px; padding:5px 15px; cursor:pointer; background:#007bff; color:white; border:none; border-radius:4px;">
+                                Zobacz Historię
+                            </button>
+                        `;
+                        card.onclick = () => renderVehicleHistory(v.id);
+                        grid.appendChild(card);
+                    });
+
+                } catch (e) {
+                    contentDiv.innerHTML = `<div class="error">Błąd: ${e.message}</div>`;
+                }
+            }
+
+            // 2. WIDOK OSI CZASU (KONKRETNY POJAZD)
+            else {
+                contentDiv.innerHTML = '<div style="text-align:center; padding:20px;">Pobieranie historii...</div>';
+                document.getElementById('add-btn').style.display = 'none';
+
+                try {
+                    // Pobieramy historię z naszego nowego endpointu w views.py
+                    const response = await fetch(`${API_BASE}vehicles/${selectedVehicleId}/history/`, { headers: getAuthHeaders() });
+
+                    if(!response.ok) throw new Error("Błąd pobierania historii");
+                    const events = await response.json();
+
+                    // Pobierz info o aucie dla tytułu (opcjonalnie można wyciągnąć z events jeśli API by zwracało)
+                    // Dla uproszczenia ustawiamy ogólny tytuł, lub można pobrać vehicle/${id}
+                    viewTitle.innerHTML = `
+                        <button onclick="renderVehicleHistory()" style="font-size:0.6em; cursor:pointer; margin-right:10px; padding:5px 10px;">⬅ Wróć</button>
+                        Historia Pojazdu
+                    `;
+
+                    if (events.length === 0) {
+                        contentDiv.innerHTML = '<div style="text-align:center; padding:40px;">To auto nie ma jeszcze żadnej historii (brak wydań, szkód, serwisów).</div>';
+                        return;
+                    }
+
+                    let timelineHtml = '<div class="timeline-container">';
+
+                    events.forEach(e => {
+                        timelineHtml += `
+                            <div class="timeline-item">
+                                <div class="timeline-date">${e.date}</div>
+                                <div class="timeline-icon" style="background-color: ${e.color};">
+                                    <i class="fas ${e.icon}"></i>
+                                </div>
+                                <div class="timeline-content" style="border-left-color: ${e.color};">
+                                    <h4 style="color:${e.color}">${e.title}</h4>
+                                    <p>${e.description}</p>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    timelineHtml += '</div>';
+                    contentDiv.innerHTML = timelineHtml;
+
+                } catch (e) {
+                    contentDiv.innerHTML = `<div class="error">Błąd: ${e.message}</div>`;
+                }
+            }
+        }
+
 
         async function renderReservations() {
             const mainContent = document.getElementById('main-content');
@@ -2418,6 +2530,8 @@
             'calendar': renderCalendar,
             'policies': renderPolicies,
             'reservations': renderReservations,
+            'vehicle_documents': renderVehicleDocsList,
+            'vehicle_history': () => renderVehicleHistory(),
 
             // --- NAPRAWIONE ZAKŁADKI SERWISOWE ---
             // Teraz wywołują funkcję renderServiceEvents z odpowiednim filtrem
