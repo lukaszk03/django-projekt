@@ -10,10 +10,10 @@ from rest_framework_simplejwt.tokens import RefreshToken  # Do generowania token
 
 # Usunięto błędny import 'User' - używamy tylko CustomUser z .models
 # DODANO: ServiceEventDto do listy importów
-from .serializers import VehicleDto, DriverDto, DamageEventDto, InsurancePolicyDto, VehicleHandoverDto, ServiceEventDto, ReservationDto, VehicleDocumentDto
+from .serializers import VehicleDto, DriverDto, DamageEventDto, InsurancePolicyDto, VehicleHandoverDto, ServiceEventDto, ReservationDto, VehicleDocumentDto, GlobalSettingsDto
 
 # DODANO: ServiceEvent do listy importów
-from .models import Vehicle, Driver, DamageEvent, InsurancePolicy, CustomUser, VehicleHandover, ServiceEvent, Reservation, VehicleDocument
+from .models import Vehicle, Driver, DamageEvent, InsurancePolicy, CustomUser, VehicleHandover, ServiceEvent, Reservation, VehicleDocument, GlobalSettings
 
 # ----------------------------------------------------
 # WIDOKI DLA ZARZĄDZANIA DANYMI FLOTY (Fleet Data ViewSets)
@@ -226,3 +226,21 @@ class ReservationViewSet(viewsets.ModelViewSet):
 class VehicleDocumentViewSet(viewsets.ModelViewSet):
     queryset = VehicleDocument.objects.select_related('vehicle').all().order_by('-uploaded_at')
     serializer_class = VehicleDocumentDto
+
+class GlobalSettingsViewSet(viewsets.ViewSet):
+    # Ten widok działa specyficznie: zawsze zwraca ten sam, jedyny rekord
+    permission_classes = [permissions.AllowAny] # Lub IsAuthenticated
+
+    def list(self, request):
+        settings_obj, created = GlobalSettings.objects.get_or_create(id=1)
+        serializer = GlobalSettingsDto(settings_obj)
+        return Response(serializer.data)
+
+    def create(self, request):
+        # Używamy create jako "update", bo mamy tylko 1 rekord
+        settings_obj, created = GlobalSettings.objects.get_or_create(id=1)
+        serializer = GlobalSettingsDto(settings_obj, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)

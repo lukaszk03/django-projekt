@@ -14,7 +14,8 @@ from .views import (
     login_view,
     register_view,
     ServiceEventViewSet,
-    VehicleDocumentViewSet
+    VehicleDocumentViewSet,
+    GlobalSettingsViewSet
 )
 
 router = DefaultRouter()
@@ -28,6 +29,7 @@ router.register(r'handovers', VehicleHandoverViewSet, basename='handover')
 router.register(r'policies', InsurancePolicyViewSet, basename='policy')
 router.register(r'reservations', ReservationViewSet, basename='reservation')
 router.register(r'vehicle_documents', VehicleDocumentViewSet, basename='vehicle_document')
+router.register(r'settings', GlobalSettingsViewSet, basename='settings')
 
 urlpatterns = [
     # Ścieżki do logowania i rejestracji

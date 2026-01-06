@@ -589,6 +589,93 @@
             document.getElementById('register-box').style.display = 'none';
         }
 
+        async function renderSettings() {
+            currentView = 'settings';
+            viewTitle.textContent = 'Konfiguracja Systemu';
+            document.getElementById('add-btn').style.display = 'none';
+
+            const contentDiv = document.getElementById('main-content');
+            contentDiv.innerHTML = 'Ładowanie ustawień...';
+
+            try {
+                // Pobieramy ustawienia (GET)
+                const response = await fetch(API_BASE + 'settings/', { headers: getAuthHeaders() });
+                const settings = await response.json();
+
+                contentDiv.innerHTML = `
+                    <div style="max-width: 600px; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+
+                        <h3 style="color:#2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">🏢 Dane Firmy (do wydruków)</h3>
+                        <label style="display:block; margin-top:10px;">Nazwa Firmy:</label>
+                        <input type="text" id="set_company_name" value="${settings.company_name}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+
+                        <label style="display:block; margin-top:10px;">Adres:</label>
+                        <input type="text" id="set_company_address" value="${settings.company_address}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+
+                        <label style="display:block; margin-top:10px;">NIP:</label>
+                        <input type="text" id="set_company_nip" value="${settings.company_nip}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+
+                        <h3 style="color:#27ae60; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 30px;">💰 Domyślne Finanse</h3>
+                        <div style="display:flex; gap:20px;">
+                            <div style="flex:1;">
+                                <label style="display:block; margin-top:10px;">Stawka za km (PLN):</label>
+                                <input type="number" step="0.01" id="set_rate_km" value="${settings.default_rate_km}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                            </div>
+                            <div style="flex:1;">
+                                <label style="display:block; margin-top:10px;">Opłata za paliwo (PLN):</label>
+                                <input type="number" step="0.01" id="set_fuel_penalty" value="${settings.default_fuel_penalty}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                            </div>
+                        </div>
+
+                        <h3 style="color:#c0392b; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 30px;">🔔 Alerty i Powiadomienia</h3>
+                        <label style="display:block; margin-top:10px;">Przypomnienie przed terminem (dni):</label>
+                        <input type="number" id="set_alert_days" value="${settings.alert_days}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+
+                        <button onclick="saveSettings()" style="margin-top: 30px; width: 100%; padding: 12px; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer;">
+                            💾 ZAPISZ USTAWIENIA
+                        </button>
+                        <div id="settings-msg" style="margin-top:10px; text-align:center; height:20px;"></div>
+                    </div>
+                `;
+
+            } catch (e) {
+                contentDiv.innerHTML = `<div class="error">Błąd: ${e.message}</div>`;
+            }
+        }
+
+        async function saveSettings() {
+            const data = {
+                company_name: document.getElementById('set_company_name').value,
+                company_address: document.getElementById('set_company_address').value,
+                company_nip: document.getElementById('set_company_nip').value,
+                default_rate_km: document.getElementById('set_rate_km').value,
+                default_fuel_penalty: document.getElementById('set_fuel_penalty').value,
+                alert_days: document.getElementById('set_alert_days').value
+            };
+
+            const msgDiv = document.getElementById('settings-msg');
+            msgDiv.textContent = "Zapisywanie...";
+            msgDiv.style.color = "blue";
+
+            try {
+                const response = await fetch(API_BASE + 'settings/', {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    msgDiv.textContent = "✅ Ustawienia zostały zaktualizowane!";
+                    msgDiv.style.color = "green";
+                } else {
+                    msgDiv.textContent = "❌ Błąd zapisu.";
+                    msgDiv.style.color = "red";
+                }
+            } catch (e) {
+                msgDiv.textContent = "❌ Błąd sieci.";
+            }
+        }
+
         async function handleRegister() {
             const username = document.getElementById('reg_username').value;
             const email = document.getElementById('reg_email').value;
@@ -2706,8 +2793,8 @@
             // Dzięki temu kliknięcie nie spowoduje błędu w konsoli
             'hr_docs': () => renderHrDocs('documents'),
             'settlements': renderSettlements,
+            'settings': renderSettings,
             'other': () => renderPlaceholder('Pozostałe'),
-            'settings': () => renderPlaceholder('Ustawienia')
         };
 
         function loadView(viewName) {

@@ -1,7 +1,7 @@
 # Master/Server/fleet_core/serializers.py
 
 from rest_framework import serializers
-from .models import Vehicle, Driver, ServiceEvent, DamageEvent, FleetCompany, InsurancePolicy, VehicleHandover, Reservation, ReservationFile, VehicleDocument
+from .models import Vehicle, Driver, ServiceEvent, DamageEvent, FleetCompany, InsurancePolicy, VehicleHandover, Reservation, ReservationFile, VehicleDocument, GlobalSettings
 
 # 1. SERIALIZER DLA POJAZDÓW
 # fleet_core/serializers.py
@@ -270,5 +270,8 @@ class VehicleDocumentDto(serializers.ModelSerializer):
         model = VehicleDocument
         fields = ['id', 'vehicle', 'vehicle_reg', 'title', 'file', 'uploaded_at', 'description']
 
-
+class GlobalSettingsDto(serializers.ModelSerializer):
+    class Meta:
+        model = GlobalSettings
+        fields = '__all__'
 

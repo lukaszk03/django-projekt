@@ -365,3 +365,29 @@ class VehicleDocument(models.Model):
 
     def __str__(self):
         return f"{self.title} ({self.vehicle.registration_number})"
+
+
+class GlobalSettings(models.Model):
+    # --- DANE FIRMY (DO WYDRUKÓW) ---
+    company_name = models.CharField(max_length=200, verbose_name="Nazwa Twojej Firmy", default="Moja Flota Sp. z o.o.")
+    company_address = models.CharField(max_length=300, verbose_name="Adres Firmy",
+                                       default="ul. Przykładowa 1, 00-001 Warszawa")
+    company_nip = models.CharField(max_length=20, verbose_name="NIP", default="000-000-00-00")
+
+    # --- DOMYŚLNE STAWKI (DO ROZLICZEŃ) ---
+    default_rate_km = models.DecimalField(max_digits=6, decimal_places=2, default=0.50,
+                                          verbose_name="Domyślna stawka za km (PLN)")
+    default_fuel_penalty = models.DecimalField(max_digits=6, decimal_places=2, default=50.00,
+                                               verbose_name="Domyślna opłata za paliwo (PLN)")
+
+    # --- ALERTY ---
+    alert_days = models.IntegerField(default=7, verbose_name="Ile dni wcześniej przypominać o terminach?")
+
+    def save(self, *args, **kwargs):
+        # Gwarancja, że istnieje tylko 1 rekord ustawień (Singleton)
+        if not self.pk and GlobalSettings.objects.exists():
+            return
+        super(GlobalSettings, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return "Ustawienia Globalne Systemu"
