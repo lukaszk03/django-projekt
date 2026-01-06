@@ -133,17 +133,30 @@ class VehicleHandoverDto(serializers.ModelSerializer):
     remove_scan_handover_protocol = serializers.BooleanField(write_only=True, required=False)
     remove_scan_return_protocol = serializers.BooleanField(write_only=True, required=False)
 
+    dystans = serializers.SerializerMethodField()
+
     class Meta:
         model = VehicleHandover
         fields = [
             'id', 'kierowca', 'pojazd', 'reservation_id',
             'imie', 'nazwisko', 'firma',
-            'marka', 'model', 'rejestracja', 'data_wydania', 'data_zwrotu', 'uwagi',
-            # Pliki (TERAZ API JE ZAAKCEPTUJE)
+            'marka', 'model', 'rejestracja',
+            'data_wydania', 'data_zwrotu', 'uwagi',
+
+            # NOWE POLA:
+            'przebieg_start', 'przebieg_stop', 'dystans',
+            'paliwo_start', 'paliwo_stop',
+            'stawka_za_km', 'koszt_brakujacego_paliwa', 'calkowity_koszt',
+
+            # Pliki i usuwanie (zachowaj je)
             'scan_agreement', 'scan_handover_protocol', 'scan_return_protocol',
-            # Usuwanie
             'remove_scan_agreement', 'remove_scan_handover_protocol', 'remove_scan_return_protocol'
         ]
+
+    def get_dystans(self, obj):
+        if obj.przebieg_stop and obj.przebieg_start:
+            return obj.przebieg_stop - obj.przebieg_start
+        return 0
 
     def update(self, instance, validated_data):
         # Logika usuwania plików

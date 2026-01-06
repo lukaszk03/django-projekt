@@ -222,7 +222,7 @@ class VehicleHandover(models.Model):
     kierowca = models.ForeignKey(Driver, on_delete=models.CASCADE, related_name='handovers')
     pojazd = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='handovers')
 
-    # --- NOWE POLE: Link do Rezerwacji (dla ID_rezerwacji) ---
+    # Link do rezerwacji
     reservation = models.ForeignKey('Reservation', on_delete=models.SET_NULL, null=True, blank=True,
                                     verbose_name="Źródłowa Rezerwacja")
 
@@ -230,12 +230,44 @@ class VehicleHandover(models.Model):
     data_zwrotu = models.DateField(verbose_name="Data Zwrotu", null=True, blank=True)
     uwagi = models.TextField(blank=True, null=True)
 
-    # --- NOWE POLA: Pliki Dokumentów ---
+    # --- NOWE POLA: DOKUMENTY ---
     scan_agreement = models.FileField(upload_to='handovers/umowy/', verbose_name="Umowa Najmu", null=True, blank=True)
     scan_handover_protocol = models.FileField(upload_to='handovers/protokoly_wydania/', verbose_name="Protokół Wydania",
                                               null=True, blank=True)
     scan_return_protocol = models.FileField(upload_to='handovers/protokoly_zwrotu/', verbose_name="Protokół Zwrotu",
                                             null=True, blank=True)
+
+    # --- NOWE POLA: ROZLICZENIE (PALIWO I PRZEBIEG) ---
+    przebieg_start = models.IntegerField(verbose_name="Przebieg przy wydaniu", default=0)
+    przebieg_stop = models.IntegerField(verbose_name="Przebieg przy zwrocie", null=True, blank=True)
+
+    FUEL_LEVELS = [
+        ('0', 'Rezerwa'),
+        ('25', '1/4 baku'),
+        ('50', '1/2 baku'),
+        ('75', '3/4 baku'),
+        ('100', 'Pełny bak'),
+    ]
+    paliwo_start = models.CharField(max_length=10, choices=FUEL_LEVELS, default='100')
+    paliwo_stop = models.CharField(max_length=10, choices=FUEL_LEVELS, null=True, blank=True)
+
+    # Koszty
+    stawka_za_km = models.DecimalField(max_digits=6, decimal_places=2, default=0.00, verbose_name="Stawka za km (PLN)")
+    koszt_brakujacego_paliwa = models.DecimalField(max_digits=8, decimal_places=2, default=0.00,
+                                                   verbose_name="Dopłata za paliwo")
+
+    # Pole obliczane (Suma)
+    calkowity_koszt = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, blank=True)
+
+    def save(self, *args, **kwargs):
+        # Automatyczne obliczanie kosztu przy zapisie
+        if self.przebieg_stop and self.przebieg_start:
+            dystans = self.przebieg_stop - self.przebieg_start
+            # Zabezpieczenie przed ujemnym dystansem
+            if dystans < 0: dystans = 0
+            koszt_km = dystans * float(self.stawka_za_km)
+            self.calkowity_koszt = koszt_km + float(self.koszt_brakujacego_paliwa)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.pojazd} -> {self.kierowca} ({self.data_wydania})"

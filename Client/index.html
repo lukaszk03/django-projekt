@@ -828,34 +828,70 @@
                     return html;
                 };
 
+                const fuelOptions = (selected) => {
+                    const opts = {'0':'Rezerwa', '25':'1/4', '50':'1/2', '75':'3/4', '100':'Pełny'};
+                    return Object.entries(opts).map(([k, v]) =>
+                        `<option value="${k}" ${String(selected) === k ? 'selected' : ''}>${v}</option>`
+                    ).join('');
+                };
+
+                // Obliczanie "na żywo" w formularzu (JavaScript)
+                window.calculateRentCost = () => {
+                    const start = parseInt(document.getElementById('h_przebieg_start').value) || 0;
+                    const stop = parseInt(document.getElementById('h_przebieg_stop').value) || 0;
+                    const stawka = parseFloat(document.getElementById('h_stawka').value) || 0;
+                    const doplata = parseFloat(document.getElementById('h_doplata').value) || 0;
+
+                    if (stop > start) {
+                        const dist = stop - start;
+                        const total = (dist * stawka) + doplata;
+                        document.getElementById('calc_dystans').innerText = dist + ' km';
+                        document.getElementById('calc_total').innerText = total.toFixed(2) + ' PLN';
+                    }
+                };
+
                 formHtml = `
                     <div style="display:flex; gap:10px;">
-                        <div style="flex:1;">
-                            <label>ID Pojazdu:</label><input type="number" id="h_pojazd_id" value="${record?.pojazd || ''}" required>
-                        </div>
-                        <div style="flex:1;">
-                            <label>ID Kierowcy:</label><input type="number" id="h_kierowca_id" value="${record?.kierowca || ''}" required>
+                        <div style="flex:1;"><label>Pojazd:</label><input type="number" id="h_pojazd_id" value="${record?.pojazd || ''}" required></div>
+                        <div style="flex:1;"><label>Kierowca:</label><input type="number" id="h_kierowca_id" value="${record?.kierowca || ''}" required></div>
+                    </div>
+
+                    <div style="background:#e9ecef; padding:10px; border-radius:5px; margin-top:10px;">
+                        <strong style="color:#007bff;">1. WYDANIE POJAZDU</strong>
+                        <div style="display:flex; gap:10px; margin-top:5px;">
+                            <div style="flex:1;"><label>Data Wydania:</label><input type="date" id="h_data_wydania" value="${record?.data_wydania || ''}" required></div>
+                            <div style="flex:1;"><label>Przebieg Start (km):</label><input type="number" id="h_przebieg_start" value="${record?.przebieg_start || 0}" oninput="calculateRentCost()"></div>
+                            <div style="flex:1;"><label>Paliwo Start:</label><select id="h_paliwo_start">${fuelOptions(record?.paliwo_start || '100')}</select></div>
                         </div>
                     </div>
 
-                    <div style="display:flex; gap:10px;">
-                        <div style="flex:1;">
-                            <label>Data Wydania:</label><input type="date" id="h_data_wydania" value="${record?.data_wydania || ''}" required>
+                    <div style="background:#d4edda; padding:10px; border-radius:5px; margin-top:10px; border:1px solid #c3e6cb;">
+                        <strong style="color:#155724;">2. ZWROT I ROZLICZENIE</strong>
+                        <div style="display:flex; gap:10px; margin-top:5px;">
+                            <div style="flex:1;"><label>Data Zwrotu:</label><input type="date" id="h_data_zwrotu" value="${record?.data_zwrotu || ''}"></div>
+                            <div style="flex:1;"><label>Przebieg Koniec (km):</label><input type="number" id="h_przebieg_stop" value="${record?.przebieg_stop || ''}" oninput="calculateRentCost()"></div>
+                            <div style="flex:1;"><label>Paliwo Koniec:</label><select id="h_paliwo_stop">${fuelOptions(record?.paliwo_stop || '')}</select></div>
                         </div>
-                        <div style="flex:1;">
-                            <label>Data Zwrotu:</label><input type="date" id="h_data_zwrotu" value="${record?.data_zwrotu || ''}">
-                        </div>
-                    </div>
-                    <label>Uwagi:</label><textarea id="h_uwagi" rows="2">${record?.uwagi || ''}</textarea>
 
-                    <div style="background:#f8f9fa; padding:10px; border:1px solid #ddd; margin-top:10px; border-radius:5px;">
-                        <h4 style="margin:0 0 10px 0; color:#007bff;">Dokumenty Najmu</h4>
-                        ${fileInputRow('Umowa Najmu', 'h_scan_agreement', 'rm_h_agreement', 'scan_agreement')}
-                        ${fileInputRow('Protokół Wydania', 'h_scan_handover', 'rm_h_handover', 'scan_handover_protocol')}
-                        ${fileInputRow('Protokół Zwrotu', 'h_scan_return', 'rm_h_return', 'scan_return_protocol')}
+                        <div style="display:flex; gap:10px; margin-top:10px; border-top:1px solid #ccc; padding-top:10px;">
+                            <div style="flex:1;"><label>Stawka za km (PLN):</label><input type="number" step="0.01" id="h_stawka" value="${record?.stawka_za_km || '0.50'}" oninput="calculateRentCost()"></div>
+                            <div style="flex:1;"><label>Dopłata Paliwo (PLN):</label><input type="number" step="0.01" id="h_doplata" value="${record?.koszt_brakujacego_paliwa || '0'}" oninput="calculateRentCost()"></div>
+                        </div>
+
+                        <div style="margin-top:10px; font-weight:bold; text-align:right; font-size:1.1em;">
+                            Dystans: <span id="calc_dystans" style="color:#007bff;">0 km</span> |
+                            SUMA: <span id="calc_total" style="color:#28a745;">0.00 PLN</span>
+                        </div>
                     </div>
-                `;
+
+                    <label style="margin-top:10px;">Uwagi:</label><textarea id="h_uwagi" rows="2">${record?.uwagi || ''}</textarea>
+
+                    `;
+
+                // Wywołaj kalkulację po załadowaniu (jeśli edytujemy)
+                setTimeout(window.calculateRentCost, 500);
             }
+
             // 5. SZKODY
             else if (viewName === 'damages') {
                 const sel = (val) => (record?.status_naprawy === val ? 'selected' : '');
@@ -1152,6 +1188,13 @@
                     formData.append('pojazd', parseInt(document.getElementById('h_pojazd_id').value));
                     formData.append('kierowca', parseInt(document.getElementById('h_kierowca_id').value));
                     formData.append('data_wydania', document.getElementById('h_data_wydania').value);
+
+                    formData.append('przebieg_start', document.getElementById('h_przebieg_start').value);
+                    formData.append('przebieg_stop', document.getElementById('h_przebieg_stop').value || '');
+                    formData.append('paliwo_start', document.getElementById('h_paliwo_start').value);
+                    formData.append('paliwo_stop', document.getElementById('h_paliwo_stop').value || '');
+                    formData.append('stawka_za_km', document.getElementById('h_stawka').value);
+                    formData.append('koszt_brakujacego_paliwa', document.getElementById('h_doplata').value);
 
                     const zwrot = document.getElementById('h_data_zwrotu').value;
                     if (zwrot) formData.append('data_zwrotu', zwrot);
