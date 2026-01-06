@@ -1897,15 +1897,15 @@
             if (activeTab === 'documents') {
                 // Ustawiamy currentView na 'vehicle_documents', żeby przycisk DODAJ wiedział co robić
                 currentView = 'vehicle_documents';
-                addBtn.style.display = 'inline';
+                addBtn.style.display = 'none';
 
                 // WAŻNE: Tutaj usunąłem linijkę "addBtn.onclick = ...",
                 // ponieważ loadView i tak ustawi domyślne działanie openModal(currentView)
 
                 await renderVehicleDocsList();
             } else {
-                currentView = 'hr_history'; // Nazwa robocza, żeby nie otwierać modalu dokumentów
-                addBtn.style.display = 'none'; // W historii nie dodajemy nic ręcznie
+                currentView = 'hr_history';
+                addBtn.style.display = 'none';
                 await renderRentalHistoryList();
             }
         }
