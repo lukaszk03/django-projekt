@@ -2301,6 +2301,10 @@
             const year = displayDate.getFullYear();
             const month = displayDate.getMonth();
 
+            // --- 1. POBIERAMY DZISIEJSZĄ DATĘ ---
+            const today = new Date();
+            // ------------------------------------
+
             const monthNames = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
                                 "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"];
 
@@ -2340,10 +2344,20 @@
                 dayDiv.className = 'calendar-day current-month';
                 dayDiv.setAttribute('data-date', dateString);
 
-                dayDiv.innerHTML = `<span class="calendar-day-number">${day}</span>`;
+                // --- 2. LOGIKA WYRÓŻNIANIA "DZIŚ" (POGRUBIENIE I RAMKA) ---
+                if (day === today.getDate() && month === today.getMonth() && year === today.getFullYear()) {
+                    dayDiv.style.border = "2px solid #949494";   // gruba ramka
+                    dayDiv.style.fontWeight = "bold";            // Pogrubiona czcionka
+                    dayDiv.style.backgroundColor = "#eeeeee";    // Lekko szare tło
+
+                    // Opcjonalnie: Zmieniamy też styl samego numerka
+                    dayDiv.innerHTML = `<span class="calendar-day-number" style="color:#000000; font-size:1.2em;">${day} </span>`;
+                } else {
+                    dayDiv.innerHTML = `<span class="calendar-day-number">${day}</span>`;
+                }
+                // ----------------------------------------------------------
 
                 const dayEvents = events.filter(e => e.date === dateString);
-
                 const borderClasses = new Set();
 
                 dayEvents.forEach(event => {
@@ -2375,7 +2389,10 @@
                     }
                 });
 
-                borderClasses.forEach(className => dayDiv.classList.add(className));
+                // Dodajemy klasy ramek tylko jeśli to NIE jest dzisiaj (żeby nie nadpisać czerwonej ramki "dziś")
+                if (!(day === today.getDate() && month === today.getMonth() && year === today.getFullYear())) {
+                    borderClasses.forEach(className => dayDiv.classList.add(className));
+                }
 
                 grid.appendChild(dayDiv);
             }
