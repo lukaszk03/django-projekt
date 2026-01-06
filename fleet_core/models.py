@@ -256,6 +256,14 @@ class Reservation(models.Model):
         verbose_name="Przypisany Pojazd"
     )
 
+    driver = models.ForeignKey(
+        'Driver',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Powiązany Kierowca (Konto)"
+    )
+
     additional_info = models.TextField(
         verbose_name="Dodatkowe informacje",
         null=True,

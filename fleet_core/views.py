@@ -130,9 +130,31 @@ def register_view(request):
 
 # 7. NOWY WIDOK DLA REZERWACJI
 class ReservationViewSet(viewsets.ModelViewSet):
-    # POPRAWKA: Usunięto select_related('company'), bo 'company' to teraz tekst, a nie klucz obcy!
     queryset = Reservation.objects.all().order_by('-created_at')
     serializer_class = ReservationDto
+
+    def perform_update(self, serializer):
+        # 1. Zapisujemy zmiany w Rezerwacji
+        instance = serializer.save()
+
+        # 2. LOGIKA AUTOMATYCZNEGO PRZEKAZANIA
+        # Jeśli status to ZATWIERDZONE oraz mamy wybrane Auto i Kierowcę
+        if instance.status == 'ZATWIERDZONE' and instance.assigned_vehicle and instance.driver:
+
+            # Sprawdzamy, czy takie przekazanie już nie istnieje (żeby nie dublować)
+            exists = VehicleHandover.objects.filter(
+                pojazd=instance.assigned_vehicle,
+                data_wydania=instance.date_from
+            ).exists()
+
+            if not exists:
+                VehicleHandover.objects.create(
+                    kierowca=instance.driver,
+                    pojazd=instance.assigned_vehicle,
+                    data_wydania=instance.date_from,
+                    data_zwrotu=instance.date_to,  # Może być null
+                    uwagi=f"Automatycznie z rezerwacji (ID: {instance.id}). {instance.additional_info or ''}"
+                )
 
 class VehicleDocumentViewSet(viewsets.ModelViewSet):
     queryset = VehicleDocument.objects.select_related('vehicle').all().order_by('-uploaded_at')

@@ -13,7 +13,7 @@ class VehicleDto(serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     typ_display = serializers.CharField(source='get_typ_pojazdu_display', read_only=True)
 
-    # --- POLA DO USUWANIA PLIKÓW (write_only - tylko do zapisu) ---
+    # --- 1. DEKLARACJA PÓL DO USUWANIA (To już pewnie masz, ale sprawdź) ---
     remove_scan_registration_card = serializers.BooleanField(write_only=True, required=False)
     remove_scan_policy_oc = serializers.BooleanField(write_only=True, required=False)
     remove_scan_policy_ac = serializers.BooleanField(write_only=True, required=False)
@@ -28,17 +28,38 @@ class VehicleDto(serializers.ModelSerializer):
             'is_active', 'przebieg', 'fuel_type', 'fuel_type_display',
             'marka', 'model', 'data_pierwszej_rejestracji', 'assigned_user', 'assigned_user_name',
             'status', 'status_display', 'typ_pojazdu', 'typ_display', 'uwagi',
-            # Pola plików
-            'scan_registration_card', 'scan_policy_oc', 'scan_policy_ac',
-            'scan_tech_inspection', 'scan_service_book', 'scan_purchase_invoice',
-            # Pola usuwania
-            'remove_scan_registration_card', 'remove_scan_policy_oc', 'remove_scan_policy_ac',
-            'remove_scan_tech_inspection', 'remove_scan_service_book', 'remove_scan_purchase_invoice'
+
+            # --- 2. TUTAJ BRAKOWAŁO PÓL PLIKÓW (MODELU) ---
+            'scan_registration_card',
+            'scan_policy_oc',
+            'scan_policy_ac',
+            'scan_tech_inspection',
+            'scan_service_book',
+            'scan_purchase_invoice',
+
+            # --- 3. I TUTAJ BRAKOWAŁO PÓL USUWANIA (To naprawia Twój błąd!) ---
+            'remove_scan_registration_card',
+            'remove_scan_policy_oc',
+            'remove_scan_policy_ac',
+            'remove_scan_tech_inspection',
+            'remove_scan_service_book',
+            'remove_scan_purchase_invoice'
         ]
 
-    # NADPISUJEMY METODĘ UPDATE, ABY OBSŁUŻYĆ USUWANIE
+    def create(self, validated_data):
+        # Usuwamy pola 'remove_scan...', ponieważ przy tworzeniu nowego pojazdu
+        # nie ma czego usuwać, a model bazy danych ich nie obsługuje.
+        validated_data.pop('remove_scan_registration_card', None)
+        validated_data.pop('remove_scan_policy_oc', None)
+        validated_data.pop('remove_scan_policy_ac', None)
+        validated_data.pop('remove_scan_tech_inspection', None)
+        validated_data.pop('remove_scan_service_book', None)
+        validated_data.pop('remove_scan_purchase_invoice', None)
+
+        return super().create(validated_data)
+
+    # --- 4. LOGIKA USUWANIA I AKTUALIZACJI ---
     def update(self, instance, validated_data):
-        # Lista par: (nazwa_pola_w_bazie, nazwa_flagi_usuwania)
         files_to_check = [
             ('scan_registration_card', 'remove_scan_registration_card'),
             ('scan_policy_oc', 'remove_scan_policy_oc'),
@@ -49,13 +70,12 @@ class VehicleDto(serializers.ModelSerializer):
         ]
 
         for field_name, remove_flag in files_to_check:
-            # Sprawdzamy, czy frontend przysłał flagę usuwania (np. remove_scan_oc=True)
+            # Jeśli zaznaczono checkbox usuwania
             if validated_data.pop(remove_flag, False):
-                # Pobieramy aktualny plik
                 file_field = getattr(instance, field_name)
                 if file_field:
-                    file_field.delete(save=False) # Usuwamy plik z dysku
-                    setattr(instance, field_name, None) # Czyścimy pole w bazie
+                    file_field.delete(save=False)  # Usuń plik
+                    setattr(instance, field_name, None)  # Wyczyść pole w bazie
 
         return super().update(instance, validated_data)
 
@@ -130,7 +150,7 @@ class ReservationFileDto(serializers.ModelSerializer):
 class ReservationDto(serializers.ModelSerializer):
     assigned_vehicle_display = serializers.ReadOnlyField(source='assigned_vehicle.registration_number')
 
-    #remove_scan = serializers.BooleanField(write_only=True, required=False)
+    driver_display = serializers.SerializerMethodField()
 
     # DO ODCZYTU: Lista już wgranych plików
     attachments = ReservationFileDto(many=True, read_only=True)
@@ -155,11 +175,14 @@ class ReservationDto(serializers.ModelSerializer):
             'id', 'first_name', 'last_name', 'company',
             'date_from', 'date_to', 'vehicle_type', 'status',
             'created_at', 'assigned_vehicle', 'assigned_vehicle_display',
-            'additional_info',
-            'attachments',  # <-- To pokaże listę plików w JSON
-            'new_files',  # <-- To przyjmie nowe pliki
-            'remove_attachment_ids'  # <-- To przyjmie ID do usunięcia
+            'additional_info', 'attachments', 'new_files', 'remove_attachment_ids',
+            'driver', 'driver_display'
         ]
+
+    def get_driver_display(self, obj):
+        if obj.driver and obj.driver.user:
+            return f"{obj.driver.user.first_name} {obj.driver.user.last_name}"
+        return None
 
     def create(self, validated_data):
         new_files = validated_data.pop('new_files', [])

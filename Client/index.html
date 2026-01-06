@@ -736,20 +736,35 @@
                     <label>Opis:</label><textarea id="opis_szkody">${record?.opis || ''}</textarea>
                 `;
             }
-            // 6. REZERWACJE (NAPRAWIONE - PRZENIESIONE NA GŁÓWNY POZIOM)
+            // ... (wcześniejszy kod openModal) ...
+
+            // 6. REZERWACJE (PODMIEŃ CAŁY TEN BLOK)
             else if (viewName === 'reservations') {
                 // 1. POBIERANIE LISTY POJAZDÓW
-                let vehicleOptions = '<option value="" selected>-- Brak / Dowolny --</option>';
+                let vehicleOptions = '<option value="">-- Brak / Dowolny --</option>';
                 try {
-                    const vehicles = await fetchVehicles(); // Używamy Twojej istniejącej funkcji
+                    const vehicles = await fetchVehicles();
                     vehicleOptions += vehicles.map(v => {
-                        // Sprawdzamy czy to auto jest przypisane do edytowanego rekordu
                         const isSelected = (record && record.assigned_vehicle === v.id) ? 'selected' : '';
                         return `<option value="${v.id}" ${isSelected}>${v.registration_number} (${v.marka} ${v.model})</option>`;
                     }).join('');
-                } catch (e) {
-                    console.error("Błąd pobierania pojazdów do listy:", e);
-                }
+                } catch (e) { console.error(e); }
+
+                // 2. NOWE: POBIERANIE LISTY KIEROWCÓW (Driverów z kontami)
+                // To jest kluczowe - bez tego handleSave wyrzuci błąd!
+                let driverOptions = '<option value="">-- Wybierz Kierowcę z Systemu --</option>';
+                try {
+                    // Upewnij się, że masz funkcję fetchDrivers(), jeśli nie - dodaj ją (kod poniżej)
+                    const response = await fetch(API_BASE + 'drivers/', { headers: getAuthHeaders() });
+                    if (response.ok) {
+                        const drivers = await response.json();
+                        drivers.forEach(d => {
+                            const name = (d.first_name || d.last_name) ? `${d.first_name} ${d.last_name}` : d.user_name;
+                            const isSel = (record && record.driver === d.id) ? 'selected' : '';
+                            driverOptions += `<option value="${d.id}" ${isSel}>${name}</option>`;
+                        });
+                    }
+                } catch(e) { console.error(e); }
 
                 const sel = (val) => (record?.vehicle_type === val ? 'selected' : '');
                 const stSel = (val) => (record?.status === val ? 'selected' : '');
@@ -757,30 +772,48 @@
                 let attachmentsHtml = '';
                 if (record && record.attachments && record.attachments.length > 0) {
                     attachmentsHtml = '<div style="margin-top: 5px; background: #fff; border: 1px solid #ccc; padding: 10px; border-radius: 4px;"><strong>Załączone pliki:</strong><ul style="list-style: none; padding-left: 0; margin-top: 5px;">';
-
                     record.attachments.forEach(file => {
-                        // Wyciągamy nazwę pliku z URL
                         const fileName = file.file.split('/').pop();
                         attachmentsHtml += `
                             <li style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px solid #eee;">
                                 <a href="${file.file}" target="_blank" style="color: blue; text-decoration: none;">📄 ${fileName}</a>
-
                                 <div style="display: flex; align-items: center; gap: 5px;">
                                     <input type="checkbox" class="remove-attachment-cb" value="${file.id}" id="remove_file_${file.id}">
                                     <label for="remove_file_${file.id}" style="color: #dc3545; font-size: 0.85em; cursor: pointer;">Usuń</label>
                                 </div>
-                            </li>
-                        `;
+                            </li>`;
                     });
                     attachmentsHtml += '</ul></div>';
-                } else {
-                    attachmentsHtml = '<div style="font-size: 0.9em; color: #777; margin-top:5px;">Brak załączników.</div>';
                 }
 
+                // TUTAJ JEST ZMIANA - DODANO POLA, KTÓRYCH BRAKOWAŁO
                 formHtml = `
-                    <label>Imię kierowcy:</label> <input type="text" id="r_first_name" value="${record?.first_name || ''}" required>
-                    <label>Nazwisko kierowcy:</label> <input type="text" id="r_last_name" value="${record?.last_name || ''}" required>
-                    <label>Nazwa Firmy:</label> <input type="text" id="r_company" value="${record?.company || ''}" required>
+                    <div style="background: #e9ecef; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+                        <small style="color:#666; font-weight:bold;">DANE WNIOSKODAWCY (Tylko tekst):</small>
+                        <div style="display:flex; gap:10px;">
+                            <div style="flex:1;"><label>Imię:</label> <input type="text" id="r_first_name" value="${record?.first_name || ''}" required></div>
+                            <div style="flex:1;"><label>Nazwisko:</label> <input type="text" id="r_last_name" value="${record?.last_name || ''}" required></div>
+                        </div>
+                        <label>Firma:</label> <input type="text" id="r_company" value="${record?.company || ''}" required>
+                    </div>
+
+                    <div style="background: #d4edda; padding: 10px; border-radius: 5px; margin-bottom: 10px; border: 1px solid #c3e6cb;">
+                        <small style="color:#155724; font-weight:bold;">WERYFIKACJA ADMINISTRATORA:</small>
+
+                        <label style="color: #155724;">Wybierz Kierowcę (Wymagane do Przekazania):</label>
+                        <select id="r_driver_id" style="border: 1px solid #28a745; background: white;">${driverOptions}</select>
+
+                        <label style="color: #007bff; margin-top:5px;">Przypisz pojazd:</label>
+                        <select id="r_assigned_vehicle" style="border: 1px solid #007bff; background:#f0f8ff;"> ${vehicleOptions} </select>
+
+                        <label style="margin-top:5px;">Status:</label>
+                        <select id="r_status" style="font-weight:bold;">
+                            <option value="OCZEKUJACE" ${stSel('OCZEKUJACE')}>Oczekujące</option>
+                            <option value="PRZYJETE" ${stSel('PRZYJETE')}>Przyjęte</option>
+                            <option value="ZATWIERDZONE" ${stSel('ZATWIERDZONE')}>✅ ZATWIERDZONE (Generuje wydanie)</option>
+                            <option value="ODRZUCONE" ${stSel('ODRZUCONE')}>Odrzucone</option>
+                        </select>
+                    </div>
 
                     <div style="display:flex; gap:10px;">
                         <div style="flex:1;"> <label>Data Od:</label> <input type="date" id="r_date_from" value="${record?.date_from || ''}" required> </div>
@@ -796,23 +829,11 @@
                         <option value="KOMBI" ${sel('KOMBI')}>Kombi</option>
                     </select>
 
-                    <label style="color: #007bff; font-weight:bold; margin-top:10px;">Przypisz pojazd:</label>
-                    <select id="r_assigned_vehicle" style="border: 1px solid #007bff; background:#f0f8ff;"> ${vehicleOptions} </select>
-
-                    <label>Status:</label>
-                    <select id="r_status">
-                        <option value="OCZEKUJACE" ${stSel('OCZEKUJACE')}>Oczekujące</option>
-                        <option value="PRZYJETE" ${stSel('PRZYJETE')}>Przyjęte</option>
-                        <option value="ZATWIERDZONE" ${stSel('ZATWIERDZONE')}>Zatwierdzone</option>
-                        <option value="ODRZUCONE" ${stSel('ODRZUCONE')}>Odrzucone</option>
-                    </select>
-
                     <label style="margin-top: 10px;">Dodatkowe informacje:</label>
                     <textarea id="r_additional_info" rows="2">${record?.additional_info || ''}</textarea>
 
-                    <label style="margin-top: 15px; font-weight:bold; color: #28a745;">Dodaj pliki (Dokumenty/Zdjęcia):</label>
+                    <label style="margin-top: 15px; font-weight:bold; color: #28a745;">Dodaj pliki:</label>
                     <input type="file" id="r_new_files" multiple accept="application/pdf,image/*">
-                    <small style="color:#666;">Możesz zaznaczyć wiele plików (przytrzymaj Ctrl).</small>
 
                     ${attachmentsHtml}
                 `;
@@ -1017,6 +1038,9 @@
                         if (assignedVal) {
                             formData.append('assigned_vehicle', parseInt(assignedVal));
                         }
+
+                        const driverVal = document.getElementById('r_driver_id').value;
+                        if (driverVal) formData.append('driver', parseInt(driverVal));
 
                         // 1. OBSŁUGA NOWYCH PLIKÓW (MULTIPLE)
                         const fileInput = document.getElementById('r_new_files');
@@ -1908,6 +1932,14 @@
                 addBtn.style.display = 'none';
                 await renderRentalHistoryList();
             }
+        }
+
+        async function fetchDrivers() {
+            try {
+                const response = await fetch(API_BASE + 'drivers/', { headers: getAuthHeaders() });
+                if (!response.ok) return [];
+                return await response.json();
+            } catch (e) { return []; }
         }
 
         async function renderDamageEvents() {
