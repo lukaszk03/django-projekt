@@ -521,7 +521,7 @@
             'legalization': 'service_events',
             'policies': 'policies',
             'reservations': 'reservations',
-            'vehicle_documents': 'vehicle_documents',
+            'vehicle_documents': 'vehicles',
             'calendar': null
         };
 
@@ -631,32 +631,73 @@
             // 2. POJAZDY
             else if (viewName === 'vehicles') {
                 const sel = (f, v) => (record && record[f] === v) ? 'selected' : '';
+
+                // Funkcja pomocnicza generująca pole pliku z opcją usuwania
+                const fileInputRow = (label, fileId, removeId, dbField) => {
+                    let html = `<label style="margin-top:10px;">${label}:</label><input type="file" id="${fileId}">`;
+
+                    // Jeśli rekord istnieje i ma wgrany plik w danym polu
+                    if (record && record[dbField]) {
+                        html += `
+                            <div style="background: #fff3cd; padding: 5px; border: 1px solid #ffeeba; border-radius: 4px; display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
+                                <span style="color: green; font-weight: bold; font-size: 0.9em;">✅ Plik jest wgrany</span>
+                                <div style="display: flex; align-items: center; gap: 5px;">
+                                    <input type="checkbox" id="${removeId}" style="width: auto; margin: 0;">
+                                    <label for="${removeId}" style="color: #dc3545; font-weight: bold; font-size: 0.85em; margin: 0; cursor: pointer;">Usuń plik</label>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    return html;
+                };
+
                 formHtml = `
-                    <label>Marka:</label><input type="text" id="v_marka" value="${record?.marka || ''}">
-                    <label>Model:</label><input type="text" id="v_model" value="${record?.model || ''}">
-                    <label>Typ:</label>
-                    <select id="v_type">
-                        <option value="OSOBOWE" ${sel('typ_pojazdu', 'OSOBOWE')}>Osobowe</option>
-                        <option value="CIEZAROWE" ${sel('typ_pojazdu', 'CIEZAROWE')}>Ciężarowe</option>
-                        <option value="AUTOBUSY" ${sel('typ_pojazdu', 'AUTOBUSY')}>Autobusy</option>
-                    </select>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                        <div><label>Marka:</label><input type="text" id="v_marka" value="${record?.marka || ''}"></div>
+                        <div><label>Model:</label><input type="text" id="v_model" value="${record?.model || ''}"></div>
+                    </div>
+
                     <label>Nr Rej:</label><input type="text" id="reg_num" value="${record?.registration_number || ''}" required>
                     <label>VIN:</label><input type="text" id="vin_num" value="${record?.vin || ''}" required>
-                    <label>Data I Rej:</label><input type="date" id="v_first_reg" value="${record?.data_pierwszej_rejestracji || ''}">
-                    <label>Paliwo:</label>
-                    <select id="fuel_type_input">
-                        <option value="DIESEL" ${sel('fuel_type', 'DIESEL')}>Diesel</option>
-                        <option value="BENZYNA" ${sel('fuel_type', 'BENZYNA')}>Benzyna</option>
-                    </select>
+
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                        <div>
+                            <label>Typ:</label>
+                            <select id="v_type">
+                                <option value="OSOBOWE" ${sel('typ_pojazdu', 'OSOBOWE')}>Osobowe</option>
+                                <option value="CIEZAROWE" ${sel('typ_pojazdu', 'CIEZAROWE')}>Ciężarowe</option>
+                                <option value="AUTOBUSY" ${sel('typ_pojazdu', 'AUTOBUSY')}>Autobusy</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Paliwo:</label>
+                            <select id="fuel_type_input">
+                                <option value="DIESEL" ${sel('fuel_type', 'DIESEL')}>Diesel</option>
+                                <option value="BENZYNA" ${sel('fuel_type', 'BENZYNA')}>Benzyna</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <label>Przebieg:</label><input type="number" id="przebieg_val" value="${record?.przebieg || ''}">
-                    <label>Firma ID:</label><input type="number" id="company_id" value="${record?.company || ''}">
-                    <label>User ID:</label><input type="number" id="v_assigned_user" value="${record?.assigned_user || ''}">
                     <label>Status:</label>
                     <select id="v_status">
                         <option value="SPRAWNY" ${sel('status', 'SPRAWNY')}>Sprawny</option>
                         <option value="NIESPRAWNY" ${sel('status', 'NIESPRAWNY')}>Niesprawny</option>
                     </select>
+
+                    <input type="hidden" id="company_id" value="${record?.company || ''}">
+                    <input type="hidden" id="v_assigned_user" value="${record?.assigned_user || ''}">
+
                     <label>Uwagi:</label><textarea id="v_uwagi">${record?.uwagi || ''}</textarea>
+
+                    <h3 style="margin-top:20px; border-bottom:2px solid #007bff; padding-bottom:5px; color:#007bff;">Dokumenty (Dodaj / Usuń)</h3>
+
+                    ${fileInputRow('Skan Dowodu Rej.', 'v_scan_registration', 'rm_scan_registration', 'scan_registration_card')}
+                    ${fileInputRow('Polisa OC', 'v_scan_oc', 'rm_scan_oc', 'scan_policy_oc')}
+                    ${fileInputRow('Polisa AC', 'v_scan_ac', 'rm_scan_ac', 'scan_policy_ac')}
+                    ${fileInputRow('Badanie Techniczne', 'v_scan_tech', 'rm_scan_tech', 'scan_tech_inspection')}
+                    ${fileInputRow('Książka Serwisowa', 'v_scan_service', 'rm_scan_service', 'scan_service_book')}
+                    ${fileInputRow('Faktura Zakupu', 'v_scan_invoice', 'rm_scan_invoice', 'scan_purchase_invoice')}
                 `;
             }
             // 3. KIEROWCY
@@ -880,22 +921,49 @@
                     method = 'POST';
                 }
                 // 2. POJAZDY
-                else if (currentView === 'vehicles') {
-                    data = {
-                        registration_number: document.getElementById('reg_num').value,
-                        vin: document.getElementById('vin_num').value,
-                        fuel_type: document.getElementById('fuel_type_input').value,
-                        przebieg: parseFloat(document.getElementById('przebieg_val').value) || 0,
-                        company: parseInt(document.getElementById('company_id').value) || null,
-                        is_active: true,
-                        marka: document.getElementById('v_marka').value,
-                        model: document.getElementById('v_model').value,
-                        data_pierwszej_rejestracji: document.getElementById('v_first_reg').value || null,
-                        assigned_user: document.getElementById('v_assigned_user').value ? parseInt(document.getElementById('v_assigned_user').value) : null,
-                        status: document.getElementById('v_status').value,
-                        typ_pojazdu: document.getElementById('v_type').value,
-                        uwagi: document.getElementById('v_uwagi').value || null
+                else if (currentView === 'vehicles' || currentView === 'vehicle_documents') {
+                    const formData = new FormData();
+                    // Pola tekstowe
+                    formData.append('registration_number', document.getElementById('reg_num').value);
+                    formData.append('vin', document.getElementById('vin_num').value);
+                    formData.append('fuel_type', document.getElementById('fuel_type_input').value);
+                    formData.append('przebieg', document.getElementById('przebieg_val').value || 0);
+                    formData.append('is_active', 'true');
+                    formData.append('marka', document.getElementById('v_marka').value);
+                    formData.append('model', document.getElementById('v_model').value);
+                    formData.append('status', document.getElementById('v_status').value);
+                    formData.append('typ_pojazdu', document.getElementById('v_type').value);
+                    formData.append('uwagi', document.getElementById('v_uwagi').value);
+
+                    const compId = document.getElementById('company_id').value;
+                    if(compId) formData.append('company', parseInt(compId));
+
+                    const userId = document.getElementById('v_assigned_user').value;
+                    if(userId) formData.append('assigned_user', parseInt(userId));
+
+                    // --- FUNKCJA POMOCNICZA DO PLIKÓW I USUWANIA ---
+                    const appendFileOrRemove = (fileInputId, removeCheckboxId, backendFileField, backendRemoveFlag) => {
+                        // 1. Czy użytkownik chce usunąć plik?
+                        const removeCb = document.getElementById(removeCheckboxId);
+                        if (removeCb && removeCb.checked) {
+                            formData.append(backendRemoveFlag, 'true');
+                        }
+
+                        // 2. Czy użytkownik dodał nowy plik? (To nadpisze usunięcie, jeśli zaznaczono oba, co jest ok)
+                        const fileInput = document.getElementById(fileInputId);
+                        if (fileInput && fileInput.files[0]) {
+                            formData.append(backendFileField, fileInput.files[0]);
+                        }
                     };
+
+                    appendFileOrRemove('v_scan_registration', 'rm_scan_registration', 'scan_registration_card', 'remove_scan_registration_card');
+                    appendFileOrRemove('v_scan_oc', 'rm_scan_oc', 'scan_policy_oc', 'remove_scan_policy_oc');
+                    appendFileOrRemove('v_scan_ac', 'rm_scan_ac', 'scan_policy_ac', 'remove_scan_policy_ac');
+                    appendFileOrRemove('v_scan_tech', 'rm_scan_tech', 'scan_tech_inspection', 'remove_scan_tech_inspection');
+                    appendFileOrRemove('v_scan_service', 'rm_scan_service', 'scan_service_book', 'remove_scan_service_book');
+                    appendFileOrRemove('v_scan_invoice', 'rm_scan_invoice', 'scan_purchase_invoice', 'remove_scan_purchase_invoice');
+
+                    data = formData;
                 }
                 // 3. SZKODY
                 else if (currentView === 'damages') {
@@ -1094,90 +1162,90 @@
             `;
         }
 
-        async function renderVehicles() {
-            const mainContent = document.getElementById('main-content');
-            if (!mainContent) return;
+        async function renderVehicleDocsList() {
+            const contentDiv = document.getElementById('docs-content');
 
-            currentView = 'vehicles';
-            viewTitle.textContent = 'Pojazdy';
+            // Grid: Lp, Marka, Model, Rej, Dowód, OC, AC, Badanie, Książka, Faktura
+            const gridLayout = "40px 100px 100px 100px 1fr 1fr 1fr 1fr 1fr 1fr";
 
-            const gridLayout = "40px 100px 100px 100px 140px 130px 100px 90px 100px 100px 120px 100px 1fr 100px";
+            // Style dla nagłówka
+            const headerStyle = `display: grid; grid-template-columns: ${gridLayout}; gap: 5px; font-weight: bold; padding: 10px; background: #fff3cd; border-bottom: 2px solid #ccc; font-size: 0.8em; text-align: center; align-items: center;`;
 
-            mainContent.innerHTML = `
-                <div class="table-header" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; align-items: center;">
+            contentDiv.innerHTML = `
+                <div class="table-header-sm" style="${headerStyle}">
                     <div>Lp.</div>
                     <div>Marka</div>
                     <div>Model</div>
-                    <div>Typ</div>
                     <div>Nr Rej.</div>
-                    <div>VIN</div>
-                    <div>Paliwo</div>
-                    <div>Przebieg</div>
-                    <div>Firma</div>
-                    <div>Użytkownik</div>
-                    <div>Data pierwszej rejestracji</div>
-                    <div>Status</div>
-                    <div>Uwagi</div>
-                    <div>Akcje</div>
+                    <div>Dowód Rej.</div>
+                    <div>Polisa OC</div>
+                    <div>Polisa AC</div>
+                    <div>Badanie Tech.</div>
+                    <div>Ks. Serwisowa</div>
+                    <div>Faktura Zakupu</div>
                 </div>
-                <div id="data-list">Ładowanie pojazdów...</div>`;
+                <div id="docs-list-items">Ładowanie danych...</div>
+            `;
 
-            const dataListDiv = document.getElementById('data-list');
+            const listDiv = document.getElementById('docs-list-items');
 
             try {
+                // Pobieramy POJAZDY, bo to one teraz trzymają te pliki
                 const response = await fetch(API_BASE + 'vehicles/', { headers: getAuthHeaders() });
-
-                if (response.status === 401) {
-                    handleLogout();
-                    throw new Error('Sesja wygasła.');
-                }
-                if (!response.ok) throw new Error(response.statusText);
-
                 const vehicles = await response.json();
-                dataListDiv.innerHTML = '';
 
-                vehicles.forEach((vehicle, index) => {
-                    const statusText = vehicle.is_active ? 'Aktywny' : 'Serwis';
-                    const companyName = vehicle.company_name || 'Brak Firmy';
-                    const paliwo = vehicle.fuel_type_display || vehicle.fuel_type || '-';
-                    const statusColor = vehicle.status === 'SPRAWNY' ? '#28a745' : '#dc3545';
+                listDiv.innerHTML = '';
+                if (vehicles.length === 0) {
+                    listDiv.innerHTML = '<div style="padding:20px;">Brak pojazdów w bazie.</div>';
+                    return;
+                }
+
+                // Funkcja pomocnicza do generowania linku lub "Brak"
+                const fileLink = (url, label) => {
+                    if (url) {
+                        return `<a href="${url}" target="_blank" style="display:block; background:#28a745; color:white; padding:4px; border-radius:4px; text-decoration:none; font-size:0.75em; text-align:center;">⬇ ${label}</a>`;
+                    }
+                    return `<span style="color:#ccc; font-size:0.75em;">- brak -</span>`;
+                };
+
+                vehicles.forEach((v, index) => {
                     const row = document.createElement('div');
-                    row.className = 'table-row';
+                    row.className = 'table-row-sm';
                     row.style.display = 'grid';
                     row.style.gridTemplateColumns = gridLayout;
-                    row.style.gap = '10px';
+                    row.style.gap = '5px';
+                    row.style.padding = '8px 5px';
+                    row.style.borderBottom = '1px solid #eee';
                     row.style.alignItems = 'center';
+                    row.style.textAlign = 'center';
 
                     row.innerHTML = `
                         <div>${index + 1}.</div>
-                        <div style="font-weight: bold;">${vehicle.marka || '---'}</div>
-                        <div>${vehicle.model || '---'}</div>
-                        <div style="font-size: 0.9em;">${vehicle.typ_display || '---'}</div>
+                        <div style="font-weight:bold;">${v.marka || '-'}</div>
+                        <div>${v.model || '-'}</div>
+                        <div style="color:#007bff; font-weight:bold;">${v.registration_number}</div>
 
-                        <div><span class="badge" style="border: 1px solid #ccc; padding: 2px 5px; border-radius: 4px; background: #f9f9f9;">${vehicle.registration_number}</span></div>
-                        <div style="font-size: 0.85em; color: #555;">${vehicle.vin}</div>
-
-
-                        <div>${paliwo}</div>
-                        <div>${vehicle.przebieg ? vehicle.przebieg.toLocaleString() : 'N/A'} km</div>
-                        <div>${companyName}</div>
-                        <div>${vehicle.assigned_user_name || '<span style="color: #999;">Brak</span>'}</div>
-                        <div style="font-size: 0.9em;">${vehicle.data_pierwszej_rejestracji || '---'}</div>
-
-                        <div style="color: ${statusColor}; font-weight: bold; font-size: 0.9em;">
-                            ${vehicle.status_display || '---'}
-                        </div>
-
-                        <div title="${vehicle.uwagi || ''}" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-style: italic; color: #666; font-size: 0.85em;">
-                            ${vehicle.uwagi || '---'}
-                        </div>
-
-                        <div>${getActionButtons(vehicle, 'vehicles')}</div>
+                        <div>${fileLink(v.scan_registration_card, 'Pobierz')}</div>
+                        <div>${fileLink(v.scan_policy_oc, 'Pobierz')}</div>
+                        <div>${fileLink(v.scan_policy_ac, 'Pobierz')}</div>
+                        <div>${fileLink(v.scan_tech_inspection, 'Pobierz')}</div>
+                        <div>${fileLink(v.scan_service_book, 'Pobierz')}</div>
+                        <div>${fileLink(v.scan_purchase_invoice, 'Pobierz')}</div>
                     `;
-                    dataListDiv.appendChild(row);
+
+                    // Opcjonalnie: Możemy dodać, że kliknięcie w wiersz otwiera edycję pojazdu, aby wgrać plik
+                    row.style.cursor = "pointer";
+                    row.title = "Kliknij, aby edytować pojazd i dodać pliki";
+                    row.onclick = (e) => {
+                        // Nie otwieraj jeśli kliknięto w link pobierania
+                        if(e.target.tagName !== 'A') openModal('vehicles', v.id);
+                    };
+
+                    listDiv.appendChild(row);
                 });
-            } catch (error) {
-                dataListDiv.innerHTML = `<div class="error">Błąd: ${error.message}. Brak danych lub brak autoryzacji.</div>`;
+
+            } catch (e) {
+                listDiv.innerHTML = `<div class="error">Błąd: ${e.message}</div>`;
             }
         }
 
@@ -1532,6 +1600,84 @@
             }
         }
 
+        async function renderVehicles() {
+            const mainContent = document.getElementById('main-content');
+            if (!mainContent) return;
+
+            currentView = 'vehicles';
+            viewTitle.textContent = 'Pojazdy';
+
+            // Grid: Lp, Marka, Model, Typ, Rej, VIN, Paliwo, Przebieg, Firma, Użytkownik, Status, Uwagi, Akcje
+            const gridLayout = "40px 100px 100px 100px 100px 150px 100px 100px 100px 120px 100px 1fr 120px";
+
+            mainContent.innerHTML = `
+                <div class="table-header-sm" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; font-weight: bold; padding: 10px; background: #ebedef; border-bottom: 2px solid #ccc; align-items: center; font-size: 0.85em;">
+                    <div>Lp.</div>
+                    <div>Marka</div>
+                    <div>Model</div>
+                    <div>Typ</div>
+                    <div>Nr Rej.</div>
+                    <div>VIN</div>
+                    <div>Paliwo</div>
+                    <div>Przebieg</div>
+                    <div>Firma</div>
+                    <div>Użytkownik</div>
+                    <div>Status</div>
+                    <div>Uwagi</div>
+                    <div style="text-align: center;">Akcje</div>
+                </div>
+                <div id="data-list">Ładowanie pojazdów...</div>
+            `;
+
+            const dataList = document.getElementById('data-list');
+
+            try {
+                const response = await fetch(API_BASE + 'vehicles/', { headers: getAuthHeaders() });
+                if (response.status === 401) { handleLogout(); return; }
+                const vehicles = await response.json();
+
+                dataList.innerHTML = '';
+                if (vehicles.length === 0) {
+                    dataList.innerHTML = '<div style="padding: 20px;">Brak pojazdów. Kliknij DODAJ.</div>';
+                    return;
+                }
+
+                vehicles.forEach((v, index) => {
+                    const row = document.createElement('div');
+                    row.className = 'table-row-sm';
+                    row.style.display = 'grid';
+                    row.style.gridTemplateColumns = gridLayout;
+                    row.style.gap = '10px';
+                    row.style.padding = '10px';
+                    row.style.borderBottom = '1px solid #eee';
+                    row.style.alignItems = 'center';
+                    row.style.fontSize = '0.85em';
+
+                    const statusColor = v.status === 'SPRAWNY' ? 'green' : 'red';
+
+                    row.innerHTML = `
+                        <div>${index + 1}.</div>
+                        <div style="font-weight:bold;">${v.marka || '-'}</div>
+                        <div>${v.model || '-'}</div>
+                        <div>${v.typ_display || v.typ_pojazdu}</div>
+                        <div style="color:#007bff; font-weight:bold;">${v.registration_number}</div>
+                        <div style="font-family:monospace;">${v.vin}</div>
+                        <div>${v.fuel_type_display || v.fuel_type}</div>
+                        <div>${v.przebieg} km</div>
+                        <div>${v.company_name || '-'}</div>
+                        <div>${v.assigned_user_name || '-'}</div>
+                        <div style="color:${statusColor}; font-weight:bold;">${v.status_display || v.status}</div>
+                        <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${v.uwagi || ''}">${v.uwagi || '-'}</div>
+                        <div style="text-align: center;">${getActionButtons(v, 'vehicles')}</div>
+                    `;
+                    dataList.appendChild(row);
+                });
+            } catch (error) {
+                dataList.innerHTML = `<div class="error">Błąd: ${error.message}</div>`;
+            }
+        }
+
+
         async function renderReservations() {
             const mainContent = document.getElementById('main-content');
             if (!mainContent) return;
@@ -1651,6 +1797,76 @@
                 dataList.innerHTML = `<div class="error">Błąd: ${error.message}</div>`;
             }
         }
+
+        async function renderRentalHistoryList() {
+            const contentDiv = document.getElementById('docs-content');
+
+            // Grid: Lp, Pojazd, Kierowca, Firma, Wydano, Zwrócono, Czas Trwania
+            const gridLayout = "50px 120px 150px 150px 120px 120px 1fr";
+
+            let html = `
+                <div class="table-header-sm" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; font-weight: bold; padding: 10px; background: #d4edda; border-bottom: 2px solid #ccc;">
+                    <div>Lp.</div>
+                    <div>Pojazd</div>
+                    <div>Kierowca</div>
+                    <div>Firma</div>
+                    <div>Data Wydania</div>
+                    <div>Data Zwrotu</div>
+                    <div>Status / Uwagi</div>
+                </div>
+                <div id="history-list-items">Ładowanie...</div>
+            `;
+            contentDiv.innerHTML = html;
+
+            const listDiv = document.getElementById('history-list-items');
+
+            try {
+                const response = await fetch(API_BASE + 'handovers/', { headers: getAuthHeaders() });
+                const data = await response.json();
+
+                // Sortujemy: najnowsze na górze
+                data.sort((a, b) => new Date(b.data_wydania) - new Date(a.data_wydania));
+
+                listDiv.innerHTML = '';
+                if (data.length === 0) {
+                    listDiv.innerHTML = '<div style="padding:20px;">Brak historii najmu.</div>';
+                    return;
+                }
+
+                data.forEach((item, index) => {
+                    const row = document.createElement('div');
+                    row.className = 'table-row-sm';
+                    row.style.display = 'grid';
+                    row.style.gridTemplateColumns = gridLayout;
+                    row.style.gap = '10px';
+                    row.style.padding = '10px';
+                    row.style.borderBottom = '1px solid #eee';
+                    row.style.alignItems = 'center';
+
+                    const isActive = !item.data_zwrotu;
+                    const statusHtml = isActive
+                        ? '<span style="color:green; font-weight:bold;">W TRAKCIE</span>'
+                        : `<span style="color:#666;">Zakończono</span>`;
+
+                    const uwagi = item.uwagi ? `<br><small style="color:#888;">${item.uwagi}</small>` : '';
+
+                    row.innerHTML = `
+                        <div>${index + 1}.</div>
+                        <div style="font-weight:bold; color:#007bff;">${item.rejestracja}</div>
+                        <div>${item.imie} ${item.nazwisko}</div>
+                        <div>${item.firma || '-'}</div>
+                        <div>${item.data_wydania}</div>
+                        <div>${item.data_zwrotu || '---'}</div>
+                        <div>${statusHtml} ${uwagi}</div>
+                    `;
+                    listDiv.appendChild(row);
+                });
+
+            } catch (e) {
+                listDiv.innerHTML = `<div class="error">Błąd: ${e.message}</div>`;
+            }
+        }
+
 
         async function renderHrDocs(activeTab = 'documents') {
             const mainContent = document.getElementById('main-content');

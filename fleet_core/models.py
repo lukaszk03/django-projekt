@@ -94,6 +94,13 @@ class Vehicle(models.Model):
     przebieg = models.FloatField(default=0.0)
     company = models.ForeignKey(FleetCompany, on_delete=models.SET_NULL, null=True, blank=True)
 
+    scan_registration_card = models.FileField(upload_to='docs/dowody/', verbose_name="Skan Dowodu Rej.", null=True, blank=True)
+    scan_policy_oc = models.FileField(upload_to='docs/oc/', verbose_name="Polisa OC", null=True, blank=True)
+    scan_policy_ac = models.FileField(upload_to='docs/ac/', verbose_name="Polisa AC", null=True, blank=True)
+    scan_tech_inspection = models.FileField(upload_to='docs/badania/', verbose_name="Badanie Techniczne", null=True, blank=True)
+    scan_service_book = models.FileField(upload_to='docs/serwis/', verbose_name="Książka Serwisowa", null=True, blank=True)
+    scan_purchase_invoice = models.FileField(upload_to='docs/faktury/', verbose_name="Faktura Zakupu", null=True, blank=True)
+
     def __str__(self):
         return f"{self.registration_number} ({self.vin})"
 
