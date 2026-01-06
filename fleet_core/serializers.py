@@ -1,7 +1,7 @@
 # Master/Server/fleet_core/serializers.py
 
 from rest_framework import serializers
-from .models import Vehicle, Driver, ServiceEvent, DamageEvent, FleetCompany, InsurancePolicy, VehicleHandover, Reservation, ReservationFile
+from .models import Vehicle, Driver, ServiceEvent, DamageEvent, FleetCompany, InsurancePolicy, VehicleHandover, Reservation, ReservationFile, VehicleDocument
 
 # 1. SERIALIZER DLA POJAZDÓW
 class VehicleDto(serializers.ModelSerializer):
@@ -155,6 +155,14 @@ class ReservationDto(serializers.ModelSerializer):
 
         # 3. Standardowa aktualizacja reszty pól
         return super().update(instance, validated_data)
+
+
+class VehicleDocumentDto(serializers.ModelSerializer):
+    vehicle_reg = serializers.ReadOnlyField(source='vehicle.registration_number')
+
+    class Meta:
+        model = VehicleDocument
+        fields = ['id', 'vehicle', 'vehicle_reg', 'title', 'file', 'uploaded_at', 'description']
 
 
 

@@ -10,10 +10,10 @@ from rest_framework_simplejwt.tokens import RefreshToken  # Do generowania token
 
 # Usunięto błędny import 'User' - używamy tylko CustomUser z .models
 # DODANO: ServiceEventDto do listy importów
-from .serializers import VehicleDto, DriverDto, DamageEventDto, InsurancePolicyDto, VehicleHandoverDto, ServiceEventDto, ReservationDto
+from .serializers import VehicleDto, DriverDto, DamageEventDto, InsurancePolicyDto, VehicleHandoverDto, ServiceEventDto, ReservationDto, VehicleDocumentDto
 
 # DODANO: ServiceEvent do listy importów
-from .models import Vehicle, Driver, DamageEvent, InsurancePolicy, CustomUser, VehicleHandover, ServiceEvent, Reservation
+from .models import Vehicle, Driver, DamageEvent, InsurancePolicy, CustomUser, VehicleHandover, ServiceEvent, Reservation, VehicleDocument
 
 # ----------------------------------------------------
 # WIDOKI DLA ZARZĄDZANIA DANYMI FLOTY (Fleet Data ViewSets)
@@ -133,3 +133,7 @@ class ReservationViewSet(viewsets.ModelViewSet):
     # POPRAWKA: Usunięto select_related('company'), bo 'company' to teraz tekst, a nie klucz obcy!
     queryset = Reservation.objects.all().order_by('-created_at')
     serializer_class = ReservationDto
+
+class VehicleDocumentViewSet(viewsets.ModelViewSet):
+    queryset = VehicleDocument.objects.select_related('vehicle').all().order_by('-uploaded_at')
+    serializer_class = VehicleDocumentDto

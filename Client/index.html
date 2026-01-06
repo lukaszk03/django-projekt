@@ -521,6 +521,7 @@
             'legalization': 'service_events',
             'policies': 'policies',
             'reservations': 'reservations',
+            'vehicle_documents': 'vehicle_documents',
             'calendar': null
         };
 
@@ -806,6 +807,30 @@
                  }
             }
 
+            // 8. NOWE DOKUMENTY POJAZDU (UPLOAD)
+            else if (viewName === 'vehicle_documents') {
+                modalTitle.textContent = "Dodaj Dokument Pojazdu";
+
+                const vehicles = await fetchVehicles();
+                const vehicleOptions = vehicles.map(v => `<option value="${v.id}">${v.registration_number}</option>`).join('');
+
+                formHtml = `
+                    <label>Pojazd:</label>
+                    <select id="doc_vehicle_id" required>
+                        ${vehicleOptions}
+                    </select>
+
+                    <label>Tytuł Dokumentu:</label>
+                    <input type="text" id="doc_title" placeholder="np. Dowód Rejestracyjny, Ubezpieczenie 2026" required>
+
+                    <label>Plik (PDF/JPG):</label>
+                    <input type="file" id="doc_file" required>
+
+                    <label>Opis (opcjonalnie):</label>
+                    <textarea id="doc_desc" rows="2"></textarea>
+                `;
+            }
+
             modalForm.innerHTML = formHtml;
             modal.style.display = "block";
         }
@@ -966,6 +991,23 @@
                         };
                     }
                 }
+
+                // 8. ZAPIS DOKUMENTU POJAZDU
+                else if (currentView === 'vehicle_documents') {
+                    const formData = new FormData();
+                    formData.append('vehicle', document.getElementById('doc_vehicle_id').value);
+                    formData.append('title', document.getElementById('doc_title').value);
+                    formData.append('description', document.getElementById('doc_desc').value);
+
+                    const fileInput = document.getElementById('doc_file');
+                    if (fileInput.files[0]) {
+                        formData.append('file', fileInput.files[0]);
+                    }
+
+                    data = formData;
+                    // endpoint jest pobierany automatycznie z endpointMap
+                }
+
 
                 // --- WYSYŁANIE ŻĄDANIA ---
                 const headers = getAuthHeaders();
@@ -1610,6 +1652,48 @@
             }
         }
 
+        async function renderHrDocs(activeTab = 'documents') {
+            const mainContent = document.getElementById('main-content');
+            if (!mainContent) return;
+
+            viewTitle.textContent = 'Dokumentacja i Historia';
+
+            // 1. Pasek zakładek
+            const navHtml = `
+                <div style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px;">
+                    <button onclick="renderHrDocs('documents')"
+                        style="padding: 10px 20px; cursor: pointer; border: none; background: ${activeTab === 'documents' ? '#007bff' : '#e9ecef'}; color: ${activeTab === 'documents' ? 'white' : 'black'}; border-radius: 4px; font-weight: bold;">
+                        📂 Dokumenty Pojazdu
+                    </button>
+                    <button onclick="renderHrDocs('history')"
+                        style="padding: 10px 20px; cursor: pointer; border: none; background: ${activeTab === 'history' ? '#007bff' : '#e9ecef'}; color: ${activeTab === 'history' ? 'white' : 'black'}; border-radius: 4px; font-weight: bold;">
+                        📜 Historia Najmu
+                    </button>
+                </div>
+                <div id="docs-content">Ładowanie...</div>
+            `;
+
+            mainContent.innerHTML = navHtml;
+
+            const addBtn = document.getElementById('add-btn');
+
+            // 2. Logika widoczności i kontekstu przycisku
+            if (activeTab === 'documents') {
+                // Ustawiamy currentView na 'vehicle_documents', żeby przycisk DODAJ wiedział co robić
+                currentView = 'vehicle_documents';
+                addBtn.style.display = 'inline';
+
+                // WAŻNE: Tutaj usunąłem linijkę "addBtn.onclick = ...",
+                // ponieważ loadView i tak ustawi domyślne działanie openModal(currentView)
+
+                await renderVehicleDocsList();
+            } else {
+                currentView = 'hr_history'; // Nazwa robocza, żeby nie otwierać modalu dokumentów
+                addBtn.style.display = 'none'; // W historii nie dodajemy nic ręcznie
+                await renderRentalHistoryList();
+            }
+        }
+
         async function renderDamageEvents() {
             viewTitle.textContent = 'Zdarzenia Szkodowe i Awarie';
             const token = localStorage.getItem('access_token');
@@ -1870,7 +1954,7 @@
 
             // --- BRAKUJĄCE ZAKŁADKI (ZABEZPIECZENIE PRZED BŁĘDEM) ---
             // Dzięki temu kliknięcie nie spowoduje błędu w konsoli
-            'hr_docs': () => renderPlaceholder('Dokumenty kadrowe'),
+            'hr_docs': () => renderHrDocs('documents'),
             'settlements': () => renderPlaceholder('Rozliczenia'),
             'other': () => renderPlaceholder('Pozostałe'),
             'settings': () => renderPlaceholder('Ustawienia')
@@ -1888,16 +1972,22 @@
                 parentView.classList.add('active');
             }
 
+            currentView = viewName;
+
+            addBtn.onclick = () => openModal(currentView);
+
             const isCalendarRelated = ['calendar', 'policies', 'tech_inspections', 'reviews', 'repairs', 'legalization', 'inspection'].includes(viewName);
 
-            if (viewName === 'vehicles' || isCalendarRelated) {
-                addBtn.style.display = 'inline';
+            if (viewName === 'calendar' || viewName === 'settings' || viewName === 'settlements') {
+                 // Tu możesz ukryć przycisk dla widoków, gdzie nie ma dodawania
+                 // addBtn.style.display = 'none';
+                 // Ale zostawmy 'inline' dla spójności, chyba że wolisz ukrywać
+                 addBtn.style.display = 'inline';
             } else {
                 addBtn.style.display = 'inline';
             }
 
             viewMap[viewName]();
-            currentView = viewName;
         }
 
         menuItems.forEach(item => {

@@ -296,3 +296,13 @@ class ReservationFile(models.Model):
 
     def __str__(self):
         return f"Plik {self.id} dla rezerwacji {self.reservation_id}"
+
+class VehicleDocument(models.Model):
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='documents', verbose_name="Pojazd")
+    title = models.CharField(max_length=200, verbose_name="Nazwa Dokumentu")
+    file = models.FileField(upload_to='pojazdy_docs/', verbose_name="Plik")
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    description = models.TextField(blank=True, null=True, verbose_name="Opis/Uwagi")
+
+    def __str__(self):
+        return f"{self.title} ({self.vehicle.registration_number})"
