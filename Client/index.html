@@ -514,6 +514,7 @@
             'drivers': 'drivers',
             'damages': 'damage_events',
             'handover': 'handovers',
+            'hr_history': 'handovers',
             'inspection': 'service_events',
             'repairs': 'service_events',
             'reviews': 'service_events',
@@ -711,14 +712,50 @@
                     <label>Badania lek:</label><input type="date" id="data_badan_val" value="${record?.data_waznosci_badan || ''}">
                 `;
             }
-            // 4. PRZEKAZANIA
+            // 4. PRZEKAZANIA (ZAKTUALIZOWANE O PLIKI)
             else if (viewName === 'handover') {
+
+                const fileInputRow = (label, fileId, removeId, dbField) => {
+                    let html = `<div style="margin-top:10px;"><label style="font-weight:bold; font-size:0.9em;">${label}:</label><br><input type="file" id="${fileId}"></div>`;
+                    if (record && record[dbField]) {
+                        html += `
+                            <div style="background: #e2e3e5; padding: 5px; border-radius: 4px; display: flex; align-items: center; gap: 10px; margin-top: 2px;">
+                                <a href="${record[dbField]}" target="_blank" style="color: blue; text-decoration: none; font-size:0.85em;">📄 Zobacz obecny</a>
+                                <div style="display: flex; align-items: center; gap: 5px; margin-left:auto;">
+                                    <input type="checkbox" id="${removeId}" style="width: auto; margin: 0;">
+                                    <label for="${removeId}" style="color: #dc3545; font-size: 0.85em; margin: 0; cursor: pointer;">Usuń</label>
+                                </div>
+                            </div>`;
+                    }
+                    return html;
+                };
+
                 formHtml = `
-                    <label>ID Pojazdu:</label><input type="number" id="h_pojazd_id" value="${record?.pojazd || ''}" required>
-                    <label>ID Kierowcy:</label><input type="number" id="h_kierowca_id" value="${record?.kierowca || ''}" required>
-                    <label>Data Wydania:</label><input type="date" id="h_data_wydania" value="${record?.data_wydania || ''}" required>
-                    <label>Data Zwrotu:</label><input type="date" id="h_data_zwrotu" value="${record?.data_zwrotu || ''}">
-                    <label>Uwagi:</label><textarea id="h_uwagi">${record?.uwagi || ''}</textarea>
+                    <div style="display:flex; gap:10px;">
+                        <div style="flex:1;">
+                            <label>ID Pojazdu:</label><input type="number" id="h_pojazd_id" value="${record?.pojazd || ''}" required>
+                        </div>
+                        <div style="flex:1;">
+                            <label>ID Kierowcy:</label><input type="number" id="h_kierowca_id" value="${record?.kierowca || ''}" required>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:10px;">
+                        <div style="flex:1;">
+                            <label>Data Wydania:</label><input type="date" id="h_data_wydania" value="${record?.data_wydania || ''}" required>
+                        </div>
+                        <div style="flex:1;">
+                            <label>Data Zwrotu:</label><input type="date" id="h_data_zwrotu" value="${record?.data_zwrotu || ''}">
+                        </div>
+                    </div>
+                    <label>Uwagi:</label><textarea id="h_uwagi" rows="2">${record?.uwagi || ''}</textarea>
+
+                    <div style="background:#f8f9fa; padding:10px; border:1px solid #ddd; margin-top:10px; border-radius:5px;">
+                        <h4 style="margin:0 0 10px 0; color:#007bff;">Dokumenty Najmu</h4>
+                        ${fileInputRow('Umowa Najmu', 'h_scan_agreement', 'rm_h_agreement', 'scan_agreement')}
+                        ${fileInputRow('Protokół Wydania', 'h_scan_handover', 'rm_h_handover', 'scan_handover_protocol')}
+                        ${fileInputRow('Protokół Zwrotu', 'h_scan_return', 'rm_h_return', 'scan_return_protocol')}
+                    </div>
                 `;
             }
             // 5. SZKODY
@@ -1011,15 +1048,35 @@
                         data_waznosci_badan: document.getElementById('data_badan_val').value || null
                     };
                 }
-                // 5. PRZEKAZANIA
-                else if (currentView === 'handover') {
-                    data = {
-                        pojazd: parseInt(document.getElementById('h_pojazd_id').value),
-                        kierowca: parseInt(document.getElementById('h_kierowca_id').value),
-                        data_wydania: document.getElementById('h_data_wydania').value,
-                        data_zwrotu: document.getElementById('h_data_zwrotu').value || null,
-                        uwagi: document.getElementById('h_uwagi').value
+                // 5. PRZEKAZANIA (ZMIANA NA FormData ABY WYSYŁAĆ PLIKI)
+                else if (currentView === 'handover' || currentView === 'hr_history') {
+                    const formData = new FormData();
+                    formData.append('pojazd', parseInt(document.getElementById('h_pojazd_id').value));
+                    formData.append('kierowca', parseInt(document.getElementById('h_kierowca_id').value));
+                    formData.append('data_wydania', document.getElementById('h_data_wydania').value);
+
+                    const zwrot = document.getElementById('h_data_zwrotu').value;
+                    if (zwrot) formData.append('data_zwrotu', zwrot);
+                    else formData.append('data_zwrotu', '');
+
+                    formData.append('uwagi', document.getElementById('h_uwagi').value);
+
+                    const appendFile = (fileId, removeId, fieldName, removeFlag) => {
+                        const fileInput = document.getElementById(fileId);
+                        if (fileInput && fileInput.files[0]) {
+                            formData.append(fieldName, fileInput.files[0]);
+                        }
+                        const removeCb = document.getElementById(removeId);
+                        if (removeCb && removeCb.checked) {
+                            formData.append(removeFlag, 'true');
+                        }
                     };
+
+                    appendFile('h_scan_agreement', 'rm_h_agreement', 'scan_agreement', 'remove_scan_agreement');
+                    appendFile('h_scan_handover', 'rm_h_handover', 'scan_handover_protocol', 'remove_scan_handover_protocol');
+                    appendFile('h_scan_return', 'rm_h_return', 'scan_return_protocol', 'remove_scan_return_protocol');
+
+                    data = formData;
                 }
                 // 6. REZERWACJE (Poprawiona logika FormData)
                 else if (currentView === 'reservations') {
@@ -1825,18 +1882,20 @@
         async function renderRentalHistoryList() {
             const contentDiv = document.getElementById('docs-content');
 
-            // Grid: Lp, Pojazd, Kierowca, Firma, Wydano, Zwrócono, Czas Trwania
-            const gridLayout = "50px 120px 150px 150px 120px 120px 1fr";
+            // Grid bez ID Rezerwacji
+            const gridLayout = "40px 100px 100px 120px 100px 100px 100px 1fr 60px";
 
             let html = `
-                <div class="table-header-sm" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; font-weight: bold; padding: 10px; background: #d4edda; border-bottom: 2px solid #ccc;">
+                <div class="table-header-sm" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; font-weight: bold; padding: 10px; background: #d4edda; border-bottom: 2px solid #ccc; font-size: 0.8em; align-items: center;">
                     <div>Lp.</div>
-                    <div>Pojazd</div>
-                    <div>Kierowca</div>
+                    <div>Imię</div>
+                    <div>Nazwisko</div>
                     <div>Firma</div>
-                    <div>Data Wydania</div>
-                    <div>Data Zwrotu</div>
-                    <div>Status / Uwagi</div>
+                    <div>Nr Rej.</div>
+                    <div>Wydano</div>
+                    <div>Zwrócono</div>
+                    <div style="text-align:center;">Dokumenty (Umowa / Wydanie / Zwrot)</div>
+                    <div style="text-align:center;">Edycja</div>
                 </div>
                 <div id="history-list-items">Ładowanie...</div>
             `;
@@ -1848,7 +1907,6 @@
                 const response = await fetch(API_BASE + 'handovers/', { headers: getAuthHeaders() });
                 const data = await response.json();
 
-                // Sortujemy: najnowsze na górze
                 data.sort((a, b) => new Date(b.data_wydania) - new Date(a.data_wydania));
 
                 listDiv.innerHTML = '';
@@ -1857,31 +1915,41 @@
                     return;
                 }
 
+                // Helper do przycisków
+                const fileBtn = (url, label, color) => {
+                    if(!url) return `<span style="color:#ccc; font-size:0.8em; margin-right:5px; opacity:0.5;">${label}</span>`;
+                    return `<a href="${url}" target="_blank" style="background:${color}; color:white; padding:3px 6px; border-radius:4px; text-decoration:none; font-size:0.75em; margin-right:5px;">⬇ ${label}</a>`;
+                };
+
                 data.forEach((item, index) => {
                     const row = document.createElement('div');
                     row.className = 'table-row-sm';
                     row.style.display = 'grid';
                     row.style.gridTemplateColumns = gridLayout;
                     row.style.gap = '10px';
-                    row.style.padding = '10px';
+                    row.style.padding = '8px 10px';
                     row.style.borderBottom = '1px solid #eee';
                     row.style.alignItems = 'center';
+                    row.style.fontSize = '0.85em';
 
-                    const isActive = !item.data_zwrotu;
-                    const statusHtml = isActive
-                        ? '<span style="color:green; font-weight:bold;">W TRAKCIE</span>'
-                        : `<span style="color:#666;">Zakończono</span>`;
-
-                    const uwagi = item.uwagi ? `<br><small style="color:#888;">${item.uwagi}</small>` : '';
+                    const zwrot = item.data_zwrotu || '<span style="color:green; font-weight:bold;">W TRAKCIE</span>';
 
                     row.innerHTML = `
                         <div>${index + 1}.</div>
-                        <div style="font-weight:bold; color:#007bff;">${item.rejestracja}</div>
-                        <div>${item.imie} ${item.nazwisko}</div>
+                        <div>${item.imie || '-'}</div>
+                        <div>${item.nazwisko || '-'}</div>
                         <div>${item.firma || '-'}</div>
+                        <div style="color:#007bff; font-weight:bold;">${item.rejestracja}</div>
                         <div>${item.data_wydania}</div>
-                        <div>${item.data_zwrotu || '---'}</div>
-                        <div>${statusHtml} ${uwagi}</div>
+                        <div>${zwrot}</div>
+                        <div style="display:flex; justify-content:center; align-items:center;">
+                            ${fileBtn(item.scan_agreement, 'Umowa', '#007bff')}
+                            ${fileBtn(item.scan_handover_protocol, 'Wydanie', '#28a745')}
+                            ${fileBtn(item.scan_return_protocol, 'Zwrot', '#dc3545')}
+                        </div>
+                        <div style="text-align:center;">
+                            <button onclick="openModal('handover', ${item.id})" style="cursor:pointer; border:1px solid #ccc; background:#fff; border-radius:4px; padding:2px 6px;">✏️</button>
+                        </div>
                     `;
                     listDiv.appendChild(row);
                 });

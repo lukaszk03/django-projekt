@@ -125,10 +125,41 @@ class VehicleHandoverDto(serializers.ModelSerializer):
     model = serializers.ReadOnlyField(source='pojazd.model')
     rejestracja = serializers.ReadOnlyField(source='pojazd.registration_number')
 
+    # ID Rezerwacji (zostawiamy w API, ale ukryjemy we frontendzie)
+    reservation_id = serializers.ReadOnlyField(source='reservation.id')
+
+    # Pola do usuwania plików
+    remove_scan_agreement = serializers.BooleanField(write_only=True, required=False)
+    remove_scan_handover_protocol = serializers.BooleanField(write_only=True, required=False)
+    remove_scan_return_protocol = serializers.BooleanField(write_only=True, required=False)
+
     class Meta:
         model = VehicleHandover
-        fields = ['id', 'kierowca', 'pojazd', 'imie', 'nazwisko', 'firma',
-                  'marka', 'model', 'rejestracja', 'data_wydania', 'data_zwrotu', 'uwagi']
+        fields = [
+            'id', 'kierowca', 'pojazd', 'reservation_id',
+            'imie', 'nazwisko', 'firma',
+            'marka', 'model', 'rejestracja', 'data_wydania', 'data_zwrotu', 'uwagi',
+            # Pliki (TERAZ API JE ZAAKCEPTUJE)
+            'scan_agreement', 'scan_handover_protocol', 'scan_return_protocol',
+            # Usuwanie
+            'remove_scan_agreement', 'remove_scan_handover_protocol', 'remove_scan_return_protocol'
+        ]
+
+    def update(self, instance, validated_data):
+        # Logika usuwania plików
+        files_to_check = [
+            ('scan_agreement', 'remove_scan_agreement'),
+            ('scan_handover_protocol', 'remove_scan_handover_protocol'),
+            ('scan_return_protocol', 'remove_scan_return_protocol'),
+        ]
+        for field, flag in files_to_check:
+            if validated_data.pop(flag, False):
+                f = getattr(instance, field)
+                if f:
+                    f.delete(save=False)
+                    setattr(instance, field, None)
+
+        return super().update(instance, validated_data)
 
 # 6. ZDARZENIA SERWISOWE (Inspekcje, Przeglądy, Naprawy) - NOWE
 class ServiceEventDto(serializers.ModelSerializer):

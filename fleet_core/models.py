@@ -221,9 +221,21 @@ class DamageEvent(models.Model):
 class VehicleHandover(models.Model):
     kierowca = models.ForeignKey(Driver, on_delete=models.CASCADE, related_name='handovers')
     pojazd = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='handovers')
+
+    # --- NOWE POLE: Link do Rezerwacji (dla ID_rezerwacji) ---
+    reservation = models.ForeignKey('Reservation', on_delete=models.SET_NULL, null=True, blank=True,
+                                    verbose_name="Źródłowa Rezerwacja")
+
     data_wydania = models.DateField(verbose_name="Data Wydania")
     data_zwrotu = models.DateField(verbose_name="Data Zwrotu", null=True, blank=True)
     uwagi = models.TextField(blank=True, null=True)
+
+    # --- NOWE POLA: Pliki Dokumentów ---
+    scan_agreement = models.FileField(upload_to='handovers/umowy/', verbose_name="Umowa Najmu", null=True, blank=True)
+    scan_handover_protocol = models.FileField(upload_to='handovers/protokoly_wydania/', verbose_name="Protokół Wydania",
+                                              null=True, blank=True)
+    scan_return_protocol = models.FileField(upload_to='handovers/protokoly_zwrotu/', verbose_name="Protokół Zwrotu",
+                                            null=True, blank=True)
 
     def __str__(self):
         return f"{self.pojazd} -> {self.kierowca} ({self.data_wydania})"
