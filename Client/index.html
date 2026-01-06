@@ -1401,6 +1401,168 @@
             `;
         }
 
+        async function renderSettlements() {
+            currentView = 'settlements';
+            viewTitle.textContent = 'Rozliczenia i Raporty Finansowe';
+
+            const contentDiv = document.getElementById('main-content');
+            contentDiv.innerHTML = '<div style="text-align:center; padding:20px;">Analizowanie danych finansowych...</div>';
+            document.getElementById('add-btn').style.display = 'none'; // Tu nic nie dodajemy ręcznie
+
+            try {
+                // 1. Pobieramy wszystkie potrzebne dane równolegle
+                const headers = getAuthHeaders();
+                const [vehicles, services, policies, handovers, damages] = await Promise.all([
+                    fetch(API_BASE + 'vehicles/', { headers }).then(r => r.json()),
+                    fetch(API_BASE + 'service_events/', { headers }).then(r => r.json()),
+                    fetch(API_BASE + 'policies/', { headers }).then(r => r.json()),
+                    fetch(API_BASE + 'handovers/', { headers }).then(r => r.json()),
+                    fetch(API_BASE + 'damage_events/', { headers }).then(r => r.json())
+                ]);
+
+                // 2. Agregacja danych (Sumowanie kosztów dla każdego pojazdu)
+                const stats = {};
+                let totalService = 0;
+                let totalPolicy = 0;
+                let totalIncome = 0;
+                let totalDamage = 0;
+
+                // Inicjalizacja obiektu dla każdego pojazdu
+                vehicles.forEach(v => {
+                    stats[v.id] = {
+                        reg: v.registration_number,
+                        marka: v.marka,
+                        model: v.model,
+                        serviceCost: 0,
+                        policyCost: 0,
+                        income: 0,
+                        damageEst: 0
+                    };
+                });
+
+                // Sumowanie Serwisów
+                services.forEach(s => {
+                    if (stats[s.pojazd]) {
+                        const k = parseFloat(s.koszt) || 0;
+                        stats[s.pojazd].serviceCost += k;
+                        totalService += k;
+                    }
+                });
+
+                // Sumowanie Polis
+                policies.forEach(p => {
+                    if (stats[p.pojazd]) { // Uwaga: w policy serializerze może być ID w polu 'pojazd'
+                        const k = parseFloat(p.koszt) || 0;
+                        stats[p.pojazd].policyCost += k;
+                        totalPolicy += k;
+                    }
+                });
+
+                // Sumowanie Dochodów z Przekazań (Obliczone: km * stawka + paliwo)
+                handovers.forEach(h => {
+                    if (stats[h.pojazd]) {
+                        const k = parseFloat(h.calkowity_koszt) || 0;
+                        stats[h.pojazd].income += k;
+                        totalIncome += k;
+                    }
+                });
+
+                // Sumowanie Szkód
+                damages.forEach(d => {
+                    if (stats[d.pojazd]) {
+                        const k = parseFloat(d.szacowany_koszt) || 0;
+                        stats[d.pojazd].damageEst += k;
+                        totalDamage += k;
+                    }
+                });
+
+                const totalExpense = totalService + totalPolicy;
+                const balance = totalIncome - totalExpense;
+
+                // 3. Budowanie HTML
+                // KARTY PODSUMOWANIA
+                let html = `
+                    <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:20px; margin-bottom:30px;">
+                        <div style="background:white; padding:15px; border-radius:8px; border-left:5px solid #28a745; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
+                            <div style="font-size:0.9em; color:#666;">Całkowity Przychód (Najem)</div>
+                            <div style="font-size:1.8em; font-weight:bold; color:#28a745;">${totalIncome.toFixed(2)} PLN</div>
+                        </div>
+                        <div style="background:white; padding:15px; border-radius:8px; border-left:5px solid #dc3545; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
+                            <div style="font-size:0.9em; color:#666;">Koszty Serwisu i Napraw</div>
+                            <div style="font-size:1.8em; font-weight:bold; color:#dc3545;">${totalService.toFixed(2)} PLN</div>
+                        </div>
+                        <div style="background:white; padding:15px; border-radius:8px; border-left:5px solid #ffc107; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
+                            <div style="font-size:0.9em; color:#666;">Koszty Ubezpieczeń</div>
+                            <div style="font-size:1.8em; font-weight:bold; color:#e0a800;">${totalPolicy.toFixed(2)} PLN</div>
+                        </div>
+                        <div style="background:white; padding:15px; border-radius:8px; border-left:5px solid #17a2b8; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
+                            <div style="font-size:0.9em; color:#666;">WYNIK KOŃCOWY (Bilans)</div>
+                            <div style="font-size:1.8em; font-weight:bold; color:${balance >= 0 ? '#17a2b8' : 'red'};">
+                                ${balance > 0 ? '+' : ''}${balance.toFixed(2)} PLN
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // TABELA SZCZEGÓŁOWA
+                const gridLayout = "40px 120px 150px 120px 120px 120px 120px 1fr";
+
+                html += `
+                    <h3 style="margin-bottom:10px; color:#34495e;">Rentowność wg Pojazdów</h3>
+                    <div class="table-header-sm" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; font-weight: bold; padding: 10px; background: #ebedef; border-bottom: 2px solid #ccc;">
+                        <div>Lp.</div>
+                        <div>Nr Rej.</div>
+                        <div>Pojazd</div>
+                        <div style="color:#28a745;">Przychód</div>
+                        <div style="color:#dc3545;">Serwis</div>
+                        <div style="color:#e0a800;">Polisy</div>
+                        <div style="color:#17a2b8;">Bilans</div>
+                        <div>Status Finansowy</div>
+                    </div>
+                    <div style="background:white; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                `;
+
+                let index = 1;
+                for (const vid in stats) {
+                    const s = stats[vid];
+                    const vehBalance = s.income - (s.serviceCost + s.policyCost);
+                    const rowColor = vehBalance >= 0 ? '#e6fff2' : '#fff5f5'; // Zielonkawe tło dla zyskownych, czerwonawe dla stratnych
+
+                    // Pasek postępu (wizualizacja rentowności)
+                    let barWidth = 0;
+                    let barColor = '#ccc';
+                    if (s.income > 0) {
+                        const totalFlow = s.income + s.serviceCost + s.policyCost;
+                        barWidth = Math.min(100, (vehBalance / s.income) * 100);
+                    }
+
+                    html += `
+                        <div class="table-row-sm" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; padding: 10px; border-bottom: 1px solid #eee; align-items: center; background-color:${rowColor};">
+                            <div>${index++}.</div>
+                            <div style="font-weight:bold;">${s.reg}</div>
+                            <div style="font-size:0.9em;">${s.marka} ${s.model}</div>
+                            <div style="font-weight:bold; color:#28a745;">${s.income.toFixed(2)}</div>
+                            <div style="color:#dc3545;">${s.serviceCost.toFixed(2)}</div>
+                            <div style="color:#e0a800;">${s.policyCost.toFixed(2)}</div>
+                            <div style="font-weight:bold; color:${vehBalance >= 0 ? 'green' : 'red'};">
+                                ${vehBalance.toFixed(2)}
+                            </div>
+                            <div style="font-size:0.8em; color:#666;">
+                                ${vehBalance > 0 ? '✅ ZYSKOWNY' : '⚠️ KOSZTOWNY'}
+                                ${s.damageEst > 0 ? `<br><span style="color:red; font-size:0.8em;">(Szkody: ${s.damageEst})</span>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }
+                html += '</div>';
+
+                contentDiv.innerHTML = html;
+
+            } catch (e) {
+                contentDiv.innerHTML = `<div class="error">Błąd generowania raportu: ${e.message}</div>`;
+            }
+        }
+
         async function renderVehicleDocsList() {
             const contentDiv = document.getElementById('docs-content');
 
@@ -2543,7 +2705,7 @@
             // --- BRAKUJĄCE ZAKŁADKI (ZABEZPIECZENIE PRZED BŁĘDEM) ---
             // Dzięki temu kliknięcie nie spowoduje błędu w konsoli
             'hr_docs': () => renderHrDocs('documents'),
-            'settlements': () => renderPlaceholder('Rozliczenia'),
+            'settlements': renderSettlements,
             'other': () => renderPlaceholder('Pozostałe'),
             'settings': () => renderPlaceholder('Ustawienia')
         };
