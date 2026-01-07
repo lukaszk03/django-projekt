@@ -114,6 +114,15 @@
             min-height: 100vh;
             overflow-y: auto;
             color: #ecf0f1;
+            flex-shrink: 0;
+        }
+
+        .text-ellipsis {
+            white-space: nowrap;      /* Nie zawijaj tekstu do nowej linii */
+            overflow: hidden;         /* Ukryj to, co wystaje */
+            text-overflow: ellipsis;  /* Dodaj trzy kropki (...) na końcu */
+            display: block;           /* Ważne dla poprawnego działania wewnątrz Grid */
+            max-width: 100%;          /* Nie przekraczaj szerokości komórki */
         }
 
         /* Nagłówek FLEETSYS */
@@ -2037,7 +2046,11 @@
                         row.innerHTML = `
                             <div>${index + 1}.</div>
                             <div style="font-weight: bold;">${event.pojazd_nr_rej || '---'}</div>
-                            <div style="font-size: 0.9em;">${event.opis}</div>
+
+                            <div class="text-ellipsis" title="${event.opis}">
+                                ${event.opis}
+                            </div>
+
                             <div>${event.koszt} PLN</div>
                             <div>${event.data_serwisu}</div>
                             <div style="text-align: center;">${getActionButtons(event, currentView)}</div>
@@ -2266,7 +2279,7 @@
                         <div>${item.data_wydania}</div>
                         <div>${zwrotText}</div>
 
-                        <div style="color: #555; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${item.uwagi || ''}">
+                        <div class="text-ellipsis" title="${item.uwagi || ''}">
                             ${item.uwagi || '-'}
                         </div>
 
@@ -2346,7 +2359,7 @@
                         <div>${v.company_name || '-'}</div>
                         <div>${v.assigned_user_name || '-'}</div>
                         <div style="color:${statusColor}; font-weight:bold;">${v.status_display || v.status}</div>
-                        <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${v.uwagi || ''}">${v.uwagi || '-'}</div>
+                        <div class="text-ellipsis" title="${v.uwagi || ''}">${v.uwagi || '-'}</div>
                         <div style="text-align: center;">${getActionButtons(v, 'vehicles')}</div>
                     `;
                     dataList.appendChild(row);
@@ -2741,7 +2754,11 @@
                     row.innerHTML = `
                         <div>${index + 1}.</div>
                         <div>${damage.pojazd_nr_rej}</div>
-                        <div>${damage.opis}</div>
+
+                        <div class="text-ellipsis" title="${damage.opis}">
+                            ${damage.opis}
+                        </div>
+
                         <div>${damage.data_zdarzenia}</div>
                         <div style="color: ${status.col}; font-weight: bold;">${status.txt}</div>
                         <div>${getActionButtons(damage, 'damages')}</div>
