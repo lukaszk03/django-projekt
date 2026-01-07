@@ -107,14 +107,12 @@ class DamageEventDto(serializers.ModelSerializer):
 # 4. POLISY
 class InsurancePolicyDto(serializers.ModelSerializer):
     pojazd_nr_rej = serializers.CharField(source='pojazd.registration_number', read_only=True)
-    # DODANO: Numer VIN (niezbędny do wyświetlenia w tabeli)
     pojazd_vin = serializers.ReadOnlyField(source='pojazd.vin')
 
     class Meta:
         model = InsurancePolicy
-        # Dodajemy 'pojazd_vin' do listy pól
+        # USUŃ LINIĘ extra_kwargs, ZOSTAWMY TYLKO FIELDS
         fields = ['id', 'pojazd', 'pojazd_nr_rej', 'pojazd_vin', 'numer_polisy', 'ubezpieczyciel', 'data_waznosci_oc', 'data_waznosci_ac', 'koszt']
-        extra_kwargs = {'pojazd': {'write_only': True}}
 
 # 5. PRZEKAZANIA
 class VehicleHandoverDto(serializers.ModelSerializer):

@@ -848,6 +848,9 @@
                     <label for="ubezpieczyciel_val">Ubezpieczyciel:</label>
                     <input type="text" id="ubezpieczyciel_val" placeholder="np. PZU, Warta" required>
 
+                    <label for="koszt_polisy_val">Koszt Polisy (PLN):</label>
+                    <input type="number" id="koszt_polisy_val" step="0.01" placeholder="0.00" required>
+
                     <label for="data_waznosci_ac_val">Data Ważności AC (opcjonalnie):</label>
                     <input type="date" id="data_waznosci_ac_val">
                  `;
@@ -1223,13 +1226,17 @@
                         <label>Data Zdarzenia/Badania:</label>
                         <input type="date" id="data_serwisu_val" value="${record.data_serwisu}" required>
                     `;
-                 } else if (endpointForType === 'policies') {
+                } else if (endpointForType === 'policies') {
                       formHtml = `
                             <label>ID Pojazdu:</label>
                             <input type="number" id="pojazd_id" value="${record.pojazd}" required>
                             <label>Numer Polisy:</label>
                             <input type="text" id="numer_polisy" value="${record.numer_polisy}" required>
                             <label>Ubezpieczyciel:</label> <input type="text" id="ubezpieczyciel_val" value="${record.ubezpieczyciel || ''}" required>
+
+                            <label>Koszt (PLN):</label>
+                            <input type="number" id="koszt_val" step="0.01" value="${record.koszt || 0}">
+
                             <label>Data Ważności OC:</label>
                             <input type="date" id="data_waznosci_oc" value="${record.data_waznosci_oc}" required>
                             <label>Data Ważności AC:</label>
@@ -1474,6 +1481,8 @@
                             pojazd: parseInt(document.getElementById('pojazd_id').value),
                             numer_polisy: document.getElementById('numer_polisy').value,
                             ubezpieczyciel: document.getElementById('ubezpieczyciel_val').value,
+                            // TUTAJ TEŻ DODAJEMY KOSZT (jeśli edytujesz polisę w kalendarzu, to pole może mieć inne ID, sprawdź funkcję openModal poniżej)
+                            koszt: parseFloat(document.getElementById('koszt_val') ? document.getElementById('koszt_val').value : 0),
                             data_waznosci_oc: document.getElementById('data_waznosci_oc').value,
                             data_waznosci_ac: document.getElementById('data_waznosci_ac').value || null
                         };
@@ -1662,7 +1671,7 @@
 
                 // 3. Budowanie HTML
                 // KARTY PODSUMOWANIA
-                let html = `
+               let html = `
                     <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:20px; margin-bottom:30px;">
                         <div style="background:white; padding:15px; border-radius:8px; border-left:5px solid #28a745; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
                             <div style="font-size:0.9em; color:#666;">Całkowity Przychód (Najem)</div>
@@ -1672,10 +1681,12 @@
                             <div style="font-size:0.9em; color:#666;">Koszty Serwisu i Napraw</div>
                             <div style="font-size:1.8em; font-weight:bold; color:#dc3545;">${totalService.toFixed(2)} PLN</div>
                         </div>
-                        <div style="background:white; padding:15px; border-radius:8px; border-left:5px solid #ffc107; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
+
+                        <div style="background:white; padding:15px; border-radius:8px; border-left:5px solid #007bff; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
                             <div style="font-size:0.9em; color:#666;">Koszty Ubezpieczeń</div>
-                            <div style="font-size:1.8em; font-weight:bold; color:#e0a800;">${totalPolicy.toFixed(2)} PLN</div>
+                            <div style="font-size:1.8em; font-weight:bold; color:#0056b3;">${totalPolicy.toFixed(2)} PLN</div>
                         </div>
+
                         <div style="background:white; padding:15px; border-radius:8px; border-left:5px solid #17a2b8; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
                             <div style="font-size:0.9em; color:#666;">WYNIK KOŃCOWY (Bilans)</div>
                             <div style="font-size:1.8em; font-weight:bold; color:${balance >= 0 ? '#17a2b8' : 'red'};">
@@ -1696,8 +1707,7 @@
                         <div>Pojazd</div>
                         <div style="color:#28a745;">Przychód</div>
                         <div style="color:#dc3545;">Serwis</div>
-                        <div style="color:#e0a800;">Polisy</div>
-                        <div style="color:#17a2b8;">Bilans</div>
+                        <div style="color:#007bff;">Polisy</div> <div style="color:#17a2b8;">Bilans</div>
                         <div>Status Finansowy</div>
                     </div>
                     <div style="background:white; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
@@ -1707,15 +1717,7 @@
                 for (const vid in stats) {
                     const s = stats[vid];
                     const vehBalance = s.income - (s.serviceCost + s.policyCost);
-                    const rowColor = vehBalance >= 0 ? '#e6fff2' : '#fff5f5'; // Zielonkawe tło dla zyskownych, czerwonawe dla stratnych
-
-                    // Pasek postępu (wizualizacja rentowności)
-                    let barWidth = 0;
-                    let barColor = '#ccc';
-                    if (s.income > 0) {
-                        const totalFlow = s.income + s.serviceCost + s.policyCost;
-                        barWidth = Math.min(100, (vehBalance / s.income) * 100);
-                    }
+                    const rowColor = vehBalance >= 0 ? '#e6fff2' : '#fff5f5';
 
                     html += `
                         <div class="table-row-sm" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; padding: 10px; border-bottom: 1px solid #eee; align-items: center; background-color:${rowColor};">
@@ -1724,7 +1726,9 @@
                             <div style="font-size:0.9em;">${s.marka} ${s.model}</div>
                             <div style="font-weight:bold; color:#28a745;">${s.income.toFixed(2)}</div>
                             <div style="color:#dc3545;">${s.serviceCost.toFixed(2)}</div>
-                            <div style="color:#e0a800;">${s.policyCost.toFixed(2)}</div>
+
+                            <div style="color:#007bff;">${s.policyCost.toFixed(2)}</div>
+
                             <div style="font-weight:bold; color:${vehBalance >= 0 ? 'green' : 'red'};">
                                 ${vehBalance.toFixed(2)}
                             </div>
