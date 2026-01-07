@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>FLEETSYS - Pełny Interfejs Floty</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚛</text></svg>">
     <style>
         /* CSS dla całego układu */
         body {
@@ -14,11 +15,94 @@
             height: 100vh;
         }
 
-        /* --- STYLY DLA LOGOWANIA --- */
-        .login-container { display: none; justify-content: center; align-items: center; height: 100vh; width: 100%; background-color: #e9ecef; }
-        .login-box { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); width: 350px; text-align: center; }
-        .login-box input[type="text"], .login-box input[type="password"], .login-box input[type="email"] { width: 100%; padding: 10px; margin: 8px 0 15px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        .login-box button { background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-size: 16px; }
+        /* --- STYLY DLA LOGOWANIA (NOWY MOTYW) --- */
+        .login-container {
+            display: none; /* Domyślnie ukryte, JS to włącza */
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100%;
+            /* Gradient pasujący do Sidebaru (#2c3e50) */
+            background: linear-gradient(135deg, #2c3e50 0%, #1a252f 100%);
+        }
+
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3); /* Gładszy cień */
+            width: 350px;
+            text-align: center;
+            position: relative;
+        }
+
+        /* Logo/Ikona nad formularzem */
+        .login-logo {
+            font-size: 3em;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .login-box h2 {
+            color: #2c3e50;
+            margin-bottom: 5px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .login-box p {
+            color: #7f8c8d;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+
+        .login-box input[type="text"],
+        .login-box input[type="password"],
+        .login-box input[type="email"],
+        .login-box select {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0 15px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+            background-color: #f9f9f9;
+        }
+
+        .login-box input:focus, .login-box select:focus {
+            border-color: #16a085; /* Zielony akcent przy pisaniu */
+            outline: none;
+            background-color: #fff;
+        }
+
+        .login-box button {
+            background-color: #16a085; /* ZIELONY (jak w menu) */
+            color: white;
+            padding: 12px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background 0.3s;
+            margin-top: 10px;
+        }
+
+        .login-box button:hover {
+            background-color: #1abc9c; /* Jaśniejszy zielony po najechaniu */
+        }
+
+        .login-box a {
+            color: #16a085;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .login-box a:hover {
+            text-decoration: underline;
+        }
 
         /* --- STYLY DLA GŁÓWNEJ APLIKACJI --- */
         .main-app { display: none; width: 100%; height: 100vh; display: flex; }
@@ -325,36 +409,46 @@
 
         <div class="login-container" id="login-container">
             <div class="login-box" id="login-box">
-                <h2>Logowanie do FLEETSYS</h2>
-                <p style="color: red; height: 1.5em;" id="login-error"></p>
+                <div class="login-logo"><i class="fas fa-shipping-fast"></i></div>
+                <h2>FLEETSYS</h2>
+                <p>Zaloguj się do systemu zarządzania flotą</p>
+
+                <p style="color: #e74c3c; min-height: 1.2em; font-weight: bold;" id="login-error"></p>
+
                 <form id="login-form">
                     <input type="text" id="username" placeholder="Nazwa użytkownika" required>
                     <input type="password" id="password" placeholder="Hasło" required>
                     <input type="password" id="pin_2fa" placeholder="PIN 2FA (tylko Admin)" style="display: none;">
-                    <button type="submit">Zaloguj</button>
+                    <button type="submit">ZALOGUJ SIĘ</button>
                 </form>
-                <p style="margin-top: 15px; font-size: 0.9em;">
+
+                <p style="margin-top: 20px; font-size: 0.85em;">
                     Nie masz konta? <a href="#" onclick="showRegister()">Załóż konto</a>
                 </p>
             </div>
 
             <div class="login-box" id="register-box" style="display: none;">
-                <h2>Załóż konto</h2>
-                <p style="color: red; height: 1.5em;" id="register-error"></p>
+                <div class="login-logo"><i class="fas fa-user-plus"></i></div>
+                <h2>Rejestracja</h2>
+                <p>Utwórz nowe konto użytkownika</p>
+
+                <p style="color: #e74c3c; min-height: 1.2em; font-weight: bold;" id="register-error"></p>
+
                 <input type="text" id="reg_first_name" placeholder="Imię" required>
                 <input type="text" id="reg_last_name" placeholder="Nazwisko" required>
-                <input type="text" id="reg_username" placeholder="Nowy login" required>
-                <input type="email" id="reg_email" placeholder="Adres e-mail" required>
-                <input type="password" id="reg_password" placeholder="Nowe hasło" required>
+                <input type="text" id="reg_username" placeholder="Login" required>
+                <input type="email" id="reg_email" placeholder="E-mail" required>
+                <input type="password" id="reg_password" placeholder="Hasło" required>
+
                 <select id="reg_role">
                     <option value="EMPLOYEE">Pracownik</option>
                     <option value="DRIVER">Kierowca</option>
                     <option value="MANAGER">Menedżer Floty</option>
                 </select>
-                <button onclick="handleRegister()" style="width: 100%; padding: 10px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px;">
-                    Zarejestruj się
-                </button>
-                <p style="margin-top: 15px; font-size: 0.9em;">
+
+                <button onclick="handleRegister()">ZAREJESTRUJ SIĘ</button>
+
+                <p style="margin-top: 20px; font-size: 0.85em;">
                     Masz już konto? <a href="#" onclick="showLogin()">Wróć do logowania</a>
                 </p>
             </div>
