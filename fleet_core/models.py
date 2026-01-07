@@ -260,13 +260,22 @@ class VehicleHandover(models.Model):
     calkowity_koszt = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, blank=True)
 
     def save(self, *args, **kwargs):
-        # Automatyczne obliczanie kosztu przy zapisie
+        # 1. Automatyczne obliczanie kosztów (To już miałeś)
         if self.przebieg_stop and self.przebieg_start:
             dystans = self.przebieg_stop - self.przebieg_start
-            # Zabezpieczenie przed ujemnym dystansem
             if dystans < 0: dystans = 0
             koszt_km = dystans * float(self.stawka_za_km)
             self.calkowity_koszt = koszt_km + float(self.koszt_brakujacego_paliwa)
+
+        # 2. NOWOŚĆ: Automatyczna aktualizacja przebiegu w pojeździe
+        # Działa tylko, gdy wpisano przebieg końcowy (zwrot)
+        if self.przebieg_stop:
+            # Sprawdzamy, czy nowy przebieg jest większy niż obecny w pojeździe
+            # (Zabezpieczenie, żeby edycja starego przekazania nie cofnęła licznika)
+            if self.przebieg_stop > self.pojazd.przebieg:
+                self.pojazd.przebieg = self.przebieg_stop
+                self.pojazd.save()  # Zapisujemy zmiany w modelu Vehicle
+
         super().save(*args, **kwargs)
 
     def __str__(self):
