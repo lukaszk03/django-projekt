@@ -144,6 +144,65 @@ class VehicleViewSet(viewsets.ModelViewSet):
 
         return Response(events)
 
+    @action(detail=False, methods=['get'])
+    def availability(self, request):
+        """
+        Zwraca listę pojazdów z flagą 'is_available' dla zadanego zakresu dat.
+        Użycie: /api/vehicles/availability/?start=YYYY-MM-DD&end=YYYY-MM-DD&exclude_id=...
+        """
+        start_date = request.query_params.get('start')
+        end_date = request.query_params.get('end')
+        # Opcjonalnie ID rezerwacji do wykluczenia (przy edycji, żeby nie blokowała samej siebie)
+        exclude_id = request.query_params.get('exclude_id')
+
+        vehicles = self.get_queryset()
+        data = []
+
+        # Jeśli brak dat, zwracamy po prostu listę wszystkich jako dostępnych (lub wg statusu)
+        if not start_date or not end_date:
+            for v in vehicles:
+                data.append({
+                    'id': v.id,
+                    'registration_number': v.registration_number,
+                    'marka': v.marka,
+                    'model': v.model,
+                    'status': v.status,  # SPRAWNY / NIESPRAWNY
+                    'is_available': True,  # Domyślnie dostępny
+                    'busy_info': ''
+                })
+            return Response(data)
+
+        # Sprawdzanie konfliktów
+        for v in vehicles:
+            # Szukamy rezerwacji, które nakładają się na termin
+            conflicts = Reservation.objects.filter(
+                assigned_vehicle=v,
+                date_from__lte=end_date,
+                date_to__gte=start_date
+            ).exclude(status='ODRZUCONE')
+
+            if exclude_id:
+                conflicts = conflicts.exclude(id=exclude_id)
+
+            is_busy = conflicts.exists()
+            busy_info = ""
+            if is_busy:
+                # Pobierz daty pierwszej kolizji dla info
+                c = conflicts.first()
+                busy_info = f"Zajęty: {c.date_from} - {c.date_to}"
+
+            data.append({
+                'id': v.id,
+                'registration_number': v.registration_number,
+                'marka': v.marka,
+                'model': v.model,
+                'status': v.status,
+                'is_available': not is_busy,
+                'busy_info': busy_info
+            })
+
+        return Response(data)
+
 # 2. WIDOK DLA UŻYTKOWNIKÓW (Kierowców)
 class DriverViewSet(viewsets.ModelViewSet):
     # Optymalizacja! Ładujemy powiązany obiekt User

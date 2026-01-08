@@ -1055,6 +1055,73 @@
         }
         window.updateFormFields = updateFormFields;
 
+        async function updateVehicleAvailability() {
+            // 1. Pobieramy daty z formularza
+            const start = document.getElementById('r_date_from').value;
+            const end = document.getElementById('r_date_to').value;
+            const vehicleSelect = document.getElementById('r_assigned_vehicle');
+
+            // Pobieramy ID aktualnie wybranego pojazdu (żeby go przywrócić po odświeżeniu listy)
+            const currentSelectedValue = vehicleSelect.value;
+
+            // Jeśli brakuje dat, nie robimy nic lub resetujemy
+            if (!start || !end) return;
+
+            // Wyświetl informację "Sprawdzam..." w selectcie
+            vehicleSelect.innerHTML = '<option>🔄 Sprawdzam dostępność...</option>';
+
+            try {
+                // Dodajemy ID edytowanej rezerwacji (currentRecordId), żeby nie blokowała samej siebie
+                let url = `${API_BASE}vehicles/availability/?start=${start}&end=${end}`;
+                if (currentRecordId && currentView === 'reservations') {
+                    url += `&exclude_id=${currentRecordId}`;
+                }
+
+                const response = await fetch(url, { headers: getAuthHeaders() });
+                const vehicles = await response.json();
+
+                // Budujemy nową listę opcji
+                let optionsHtml = '<option value="">-- Wybierz Pojazd --</option>';
+
+                vehicles.forEach(v => {
+                    let icon = '✅';
+                    let textInfo = '';
+                    let isDisabled = false;
+                    let styleColor = 'black';
+
+                    // 1. Sprawdzamy stan techniczny
+                    if (v.status === 'NIESPRAWNY') {
+                        icon = '❌';
+                        textInfo = '(NIESPRAWNY)';
+                        isDisabled = true; // Blokujemy wybór
+                        styleColor = '#dc3545'; // Czerwony
+                    }
+                    // 2. Sprawdzamy dostępność w terminie
+                    else if (!v.is_available) {
+                        icon = '⛔';
+                        textInfo = `(ZAJĘTY: ${v.busy_info})`; // Info z serwera kiedy zajęty
+                        isDisabled = true; // Blokujemy wybór
+                        styleColor = '#e67e22'; // Pomarańczowy
+                    }
+
+                    // Czy ten pojazd był wcześniej wybrany?
+                    const isSelected = (String(v.id) === String(currentSelectedValue)) ? 'selected' : '';
+
+                    optionsHtml += `
+                        <option value="${v.id}" ${isSelected} ${isDisabled ? 'disabled' : ''} style="color:${styleColor}; font-weight:${isDisabled ? 'bold' : 'normal'};">
+                            ${icon} ${v.registration_number} (${v.marka} ${v.model}) ${textInfo}
+                        </option>
+                    `;
+                });
+
+                vehicleSelect.innerHTML = optionsHtml;
+
+            } catch (e) {
+                console.error("Błąd sprawdzania dostępności:", e);
+                vehicleSelect.innerHTML = '<option value="">⚠️ Błąd sprawdzania dostępności</option>';
+            }
+        }
+
 
         /** Otwiera modal i ładuje odpowiedni formularz */
        async function openModal(viewName, recordOrId = null) {
@@ -1304,32 +1371,27 @@
             }
             // ... (wcześniejszy kod openModal) ...
 
-            // 6. REZERWACJE (PODMIEŃ CAŁY TEN BLOK)
+            // 6. REZERWACJE (POPRAWIONE)
             else if (viewName === 'reservations') {
-                // 1. POBIERANIE LISTY POJAZDÓW (Zaktualizowane o status)
+                // 1. POBIERANIE LISTY POJAZDÓW
                 let vehicleOptions = '<option value="">-- Brak / Dowolny --</option>';
                 try {
                     const vehicles = await fetchVehicles();
                     vehicleOptions += vehicles.map(v => {
                         const isSelected = (record && record.assigned_vehicle === v.id) ? 'selected' : '';
-
-                        // Dodajemy ikonkę statusu dla czytelności
                         let statusIcon = '❓';
                         if (v.status === 'SPRAWNY') statusIcon = '✅';
                         else if (v.status === 'NIESPRAWNY') statusIcon = '❌';
 
-                        // Wyświetlamy: Rejestracja (Model) [IKONA STATUS]
                         return `<option value="${v.id}" ${isSelected}>
                             ${v.registration_number} (${v.marka} ${v.model}) — ${statusIcon} ${v.status}
                         </option>`;
                     }).join('');
                 } catch (e) { console.error(e); }
 
-                // 2. NOWE: POBIERANIE LISTY KIEROWCÓW (Driverów z kontami)
-                // To jest kluczowe - bez tego handleSave wyrzuci błąd!
+                // 2. POBIERANIE LISTY KIEROWCÓW
                 let driverOptions = '<option value="">-- Wybierz Kierowcę z Systemu --</option>';
                 try {
-                    // Upewnij się, że masz funkcję fetchDrivers(), jeśli nie - dodaj ją (kod poniżej)
                     const response = await fetch(API_BASE + 'drivers/', { headers: getAuthHeaders() });
                     if (response.ok) {
                         const drivers = await response.json();
@@ -1361,7 +1423,6 @@
                     attachmentsHtml += '</ul></div>';
                 }
 
-                // TUTAJ JEST ZMIANA - DODANO POLA, KTÓRYCH BRAKOWAŁO
                 formHtml = `
                     <div style="background: #e9ecef; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
                         <small style="color:#666; font-weight:bold;">DANE WNIOSKODAWCY (Tylko tekst):</small>
@@ -1391,8 +1452,14 @@
                     </div>
 
                     <div style="display:flex; gap:10px;">
-                        <div style="flex:1;"> <label>Data Od:</label> <input type="date" id="r_date_from" value="${record?.date_from || ''}" required> </div>
-                        <div style="flex:1;"> <label>Data Do:</label> <input type="date" id="r_date_to" value="${record?.date_to || ''}" required> </div>
+                        <div style="flex:1;">
+                            <label>Data Od:</label>
+                            <input type="date" id="r_date_from" value="${record?.date_from || ''}" required onchange="updateVehicleAvailability()">
+                        </div>
+                        <div style="flex:1;">
+                            <label>Data Do:</label>
+                            <input type="date" id="r_date_to" value="${record?.date_to || ''}" required onchange="updateVehicleAvailability()">
+                        </div>
                     </div>
 
                     <label>Preferowany Typ:</label>
@@ -1412,6 +1479,10 @@
 
                     ${attachmentsHtml}
                 `;
+
+                if (record && record.date_from && record.date_to) {
+                    setTimeout(updateVehicleAvailability, 200);
+                }
             }
             // 7. EDYCJA ISTNIEJĄCYCH ZDARZEŃ (POLISY, BADANIA, NAPRAWY)
             else if (isCalendarEventView && currentRecordId) {
