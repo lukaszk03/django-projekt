@@ -445,6 +445,7 @@
 
                 <input type="text" id="reg_first_name" placeholder="Imię" required>
                 <input type="text" id="reg_last_name" placeholder="Nazwisko" required>
+                <input type="text" id="reg_company_name" placeholder="Nazwa Firmy" required>
                 <input type="text" id="reg_username" placeholder="Login" required>
                 <input type="email" id="reg_email" placeholder="E-mail" required>
                 <input type="password" id="reg_password" placeholder="Hasło" required>
@@ -785,6 +786,11 @@
 
             const first_name = document.getElementById('reg_first_name').value;
             const last_name = document.getElementById('reg_last_name').value;
+
+            // --- BRAKOWAŁO TEJ LINIJKI ---
+            const company_name = document.getElementById('reg_company_name').value;
+            // -----------------------------
+
             const errorElem = document.getElementById('register-error');
 
             errorElem.textContent = "";
@@ -792,14 +798,15 @@
             // 2. SPRAWDZAMY ZGODNOŚĆ HASEŁ
             if (password !== passwordConfirm) {
                 errorElem.textContent = "Hasła muszą być identyczne!";
-                return; // Przerywamy funkcję, nie wysyłamy do serwera
+                return;
             }
 
             try {
                 const response = await fetch('http://127.0.0.1:8000/api/register/', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, email, password, first_name, last_name })
+                    // Teraz zmienna company_name jest już zdefiniowana i zadziała:
+                    body: JSON.stringify({ username, email, password, first_name, last_name, company_name })
                 });
 
                 const data = await response.json();
@@ -811,6 +818,7 @@
                     errorElem.textContent = data.detail || "Błąd rejestracji";
                 }
             } catch (error) {
+                console.error(error); // Dodano logowanie błędu do konsoli, żeby łatwiej diagnozować
                 errorElem.textContent = "Błąd połączenia z serwerem.";
             }
         }

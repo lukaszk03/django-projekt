@@ -13,7 +13,7 @@ from rest_framework_simplejwt.tokens import RefreshToken  # Do generowania token
 from .serializers import VehicleDto, DriverDto, DamageEventDto, InsurancePolicyDto, VehicleHandoverDto, ServiceEventDto, ReservationDto, VehicleDocumentDto, GlobalSettingsDto
 
 # DODANO: ServiceEvent do listy importów
-from .models import Vehicle, Driver, DamageEvent, InsurancePolicy, CustomUser, VehicleHandover, ServiceEvent, Reservation, VehicleDocument, GlobalSettings
+from .models import Vehicle, Driver, DamageEvent, InsurancePolicy, CustomUser, VehicleHandover, ServiceEvent, Reservation, VehicleDocument, GlobalSettings, FleetCompany
 
 # ----------------------------------------------------
 # WIDOKI DLA ZARZĄDZANIA DANYMI FLOTY (Fleet Data ViewSets)
@@ -178,6 +178,10 @@ def register_view(request):
     username = request.data.get('username')
     password = request.data.get('password')
     email = request.data.get('email')
+
+    # 1. POPRAWKA: Pobieramy nazwę firmy z żądania
+    company_name = request.data.get('company_name', '').strip()
+
     rola = 'DRIVER'
     first_name = request.data.get('first_name', '')
     last_name = request.data.get('last_name', '')
@@ -185,20 +189,35 @@ def register_view(request):
     if not username or not password:
         return Response({'detail': 'Nazwa użytkownika i hasło są wymagane.'}, status=status.HTTP_400_BAD_REQUEST)
 
+    # 2. POPRAWKA: Sprawdzamy, czy podano firmę
+    if not company_name:
+        return Response({'detail': 'Podanie nazwy firmy jest wymagane.'}, status=status.HTTP_400_BAD_REQUEST)
+
     if CustomUser.objects.filter(username=username).exists():
         return Response({'detail': 'Użytkownik o tej nazwie już istnieje.'}, status=status.HTTP_400_BAD_REQUEST)
 
     user = CustomUser.objects.create_user(
-        username=username, 
-        password=password, 
-        email=email, 
-        rola=rola, 
-        first_name=first_name, 
+        username=username,
+        password=password,
+        email=email,
+        rola=rola,
+        first_name=first_name,
         last_name=last_name
     )
 
-    from .models import Driver
-    Driver.objects.create(user=user, numer_prawa_jazdy="", kategorie_prawa_jazdy="B")
+    # 3. POPRAWKA: Poprawna składnia (zamknięcie nawiasu)
+    company_obj, created = FleetCompany.objects.get_or_create(
+        nazwa=company_name,
+        defaults={'nip': ''}
+    )
+
+    # 4. POPRAWKA: Tylko jedno tworzenie kierowcy
+    Driver.objects.create(
+        user=user,
+        company=company_obj,
+        numer_prawa_jazdy="",
+        kategorie_prawa_jazdy="B"
+    )
 
     return Response({'detail': 'Konto zostało utworzone. Możesz się zalogować.'}, status=status.HTTP_201_CREATED)
 
