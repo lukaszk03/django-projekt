@@ -458,6 +458,20 @@
         .timeline-content h4 { margin: 0 0 5px 0; font-size: 1.1em; }
         .timeline-content p { margin: 0; font-size: 0.9em; color: #666; }
 
+        /* --- STYLY DLA SORTOWANIA --- */
+        .sort-header {
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: color 0.2s;
+        }
+        .sort-header:hover {
+            color: #007bff; /* Niebieski po najechaniu */
+            background-color: rgba(0,0,0,0.05); /* Lekkie tło */
+        }
+
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -649,6 +663,84 @@
 
         let currentView = 'vehicles';
         let currentRecordId = null;
+
+        // --- LOGIKA SORTOWANIA ---
+        let sortState = {
+            column: null,
+            asc: true
+        };
+
+        // Resetowanie sortowania przy zmianie zakładki
+        const originalLoadView = loadView;
+        loadView = function(viewName) {
+            // Resetujemy sortowanie tylko jeśli zmieniamy na inny widok
+            if (currentView !== viewName) {
+                sortState = { column: null, asc: true };
+            }
+            originalLoadView(viewName);
+        };
+
+        // Funkcja obsługująca kliknięcie w nagłówek
+        function handleSort(column) {
+            if (sortState.column === column) {
+                sortState.asc = !sortState.asc; // Odwróć kolejność
+            } else {
+                sortState.column = column;
+                sortState.asc = true; // Domyślnie rosnąco
+            }
+            // Przeładuj aktualny widok, aby zastosować sortowanie
+            if (currentView === 'vehicles') renderVehicles();
+            else if (currentView === 'drivers') renderDrivers();
+            else if (currentView === 'handover') renderHandovers();
+            else if (currentView === 'damages') renderDamageEvents();
+            else if (currentView === 'reservations') renderReservations();
+            else if (currentView === 'settlements') renderSettlements();
+            else if (currentView === 'vehicle_documents') renderVehicleDocsList();
+
+            // Dla widoków serwisowych (przeglądy, naprawy itp.)
+            else if (['reviews', 'repairs', 'tech_inspections', 'inspection'].includes(currentView)) {
+                renderServiceEvents(currentView);
+            }
+        }
+
+        // Funkcja sortująca tablicę danych
+        function applySort(data) {
+            if (!sortState.column) return data;
+
+            return data.sort((a, b) => {
+                let valA = a[sortState.column];
+                let valB = b[sortState.column];
+
+                // Obsługa null/undefined
+                if (valA == null) valA = "";
+                if (valB == null) valB = "";
+
+                // Jeśli liczby
+                if (typeof valA === 'number' && typeof valB === 'number') {
+                    return sortState.asc ? valA - valB : valB - valA;
+                }
+
+                // Jeśli tekst
+                valA = valA.toString().toLowerCase();
+                valB = valB.toString().toLowerCase();
+
+                if (valA < valB) return sortState.asc ? -1 : 1;
+                if (valA > valB) return sortState.asc ? 1 : -1;
+                return 0;
+            });
+        }
+
+        // Helper generujący HTML nagłówka z strzałką
+        function getSortHeader(label, columnKey) {
+            let icon = '';
+            if (sortState.column === columnKey) {
+                icon = sortState.asc ? '▲' : '▼';
+            } else {
+                icon = '<span style="opacity:0.3; font-size:0.8em;">⇅</span>';
+            }
+            // Zwracamy HTML z obsługą onclick
+            return `<div class="sort-header" onclick="handleSort('${columnKey}')">${label} ${icon}</div>`;
+        }
 
         // --- FUNKCJE POMOCNICZE ---
 
@@ -1702,7 +1794,7 @@
             document.getElementById('add-btn').style.display = 'none';
 
             try {
-                // 1. POBIERANIE DANYCH (Raz, na początku)
+                // 1. POBIERANIE DANYCH
                 const headers = getAuthHeaders();
                 const [vehicles, services, policies, handovers, damages] = await Promise.all([
                     fetch(API_BASE + 'vehicles/', { headers }).then(r => r.json()),
@@ -1763,15 +1855,13 @@
 
                 // 3. LOGIKA FILTROWANIA I OBLICZEŃ
                 const calculateAndShow = () => {
-                    const mode = document.getElementById('filter_mode').value; // ALL, YEAR, MONTH
+                    const mode = document.getElementById('filter_mode').value;
                     const year = parseInt(document.getElementById('filter_year').value);
                     const month = parseInt(document.getElementById('filter_month').value);
 
-                    // Funkcja pomocnicza: czy data mieści się w wybranym okresie?
                     const isInPeriod = (dateString) => {
                         if (!dateString) return false;
                         if (mode === 'ALL') return true;
-
                         const d = new Date(dateString);
                         if (mode === 'YEAR') {
                             return d.getFullYear() === year;
@@ -1782,12 +1872,10 @@
                         return true;
                     };
 
-                    // --- Resetowanie liczników ---
                     const stats = {};
                     let totalService = 0;
                     let totalPolicy = 0;
                     let totalIncome = 0;
-                    let totalDamage = 0;
 
                     vehicles.forEach(v => {
                         stats[v.id] = {
@@ -1797,13 +1885,11 @@
                             serviceCost: 0,
                             policyCost: 0,
                             income: 0,
-                            damageEst: 0
+                            balance: 0
                         };
                     });
 
-                    // --- Agregacja z filtrem daty ---
-
-                    // 1. Serwisy (data_serwisu)
+                    // Agregacja danych
                     services.forEach(s => {
                         if (stats[s.pojazd] && isInPeriod(s.data_serwisu)) {
                             const k = parseFloat(s.koszt) || 0;
@@ -1812,9 +1898,7 @@
                         }
                     });
 
-                    // 2. Polisy (data_waznosci_oc) - traktujemy to jako datę poniesienia kosztu
                     policies.forEach(p => {
-                        // Uwaga: tutaj API może zwracać ID pojazdu
                         if (stats[p.pojazd] && isInPeriod(p.data_waznosci_oc)) {
                             const k = parseFloat(p.koszt) || 0;
                             stats[p.pojazd].policyCost += k;
@@ -1822,7 +1906,6 @@
                         }
                     });
 
-                    // 3. Przekazania/Przychód (data_wydania)
                     handovers.forEach(h => {
                         if (stats[h.pojazd] && isInPeriod(h.data_wydania)) {
                             const k = parseFloat(h.calkowity_koszt) || 0;
@@ -1831,19 +1914,24 @@
                         }
                     });
 
-                    // 4. Szkody (data_zdarzenia)
-                    damages.forEach(d => {
-                        if (stats[d.pojazd] && isInPeriod(d.data_zdarzenia)) {
-                            const k = parseFloat(d.szacowany_koszt) || 0;
-                            stats[d.pojazd].damageEst += k;
-                            totalDamage += k;
-                        }
+                    // Konwersja na tablicę
+                    let resultsArray = Object.values(stats).map(s => {
+                        s.balance = s.income - (s.serviceCost + s.policyCost);
+                        return s;
                     });
+
+                    // Filtrowanie pustych (jeśli nie wybrano "Całościowy")
+                    if (mode !== 'ALL') {
+                        resultsArray = resultsArray.filter(s => s.income !== 0 || s.serviceCost !== 0 || s.policyCost !== 0);
+                    }
+
+                    // --- SORTOWANIE ---
+                    resultsArray = applySort(resultsArray);
 
                     const totalExpense = totalService + totalPolicy;
                     const balance = totalIncome - totalExpense;
 
-                    // --- GENEROWANIE HTML WYNIKÓW ---
+                    // --- GENEROWANIE HTML ---
                     let resultsHtml = `
                         <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:20px; margin-bottom:30px;">
                             <div style="background:white; padding:15px; border-radius:8px; border-left:5px solid #28a745; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
@@ -1868,24 +1956,21 @@
 
                         <h3 style="margin-bottom:10px; color:#34495e;">Szczegóły Pojazdów</h3>
                         <div class="table-header-sm" style="display: grid; grid-template-columns: 40px 120px 150px 120px 120px 120px 120px 1fr; gap: 10px; font-weight: bold; padding: 10px; background: #ebedef; border-bottom: 2px solid #ccc;">
-                            <div>Lp.</div> <div>Nr Rej.</div> <div>Pojazd</div>
-                            <div style="color:#28a745;">Przychód</div>
-                            <div style="color:#dc3545;">Serwis</div>
-                            <div style="color:#007bff;">Polisy</div>
-                            <div style="color:#17a2b8;">Bilans</div>
+                            <div>Lp.</div>
+                            ${getSortHeader('Nr Rej.', 'reg')}
+                            ${getSortHeader('Pojazd', 'model')}
+                            ${getSortHeader('Przychód', 'income')}
+                            ${getSortHeader('Serwis', 'serviceCost')}
+                            ${getSortHeader('Polisy', 'policyCost')}
+                            ${getSortHeader('Bilans', 'balance')}
                             <div>Status</div>
                         </div>
                         <div style="background:white; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
                     `;
 
                     let index = 1;
-                    for (const vid in stats) {
-                        const s = stats[vid];
-                        // Pokazuj tylko jeśli były jakieś ruchy finansowe w tym okresie LUB jest to raport całościowy
-                        if (mode !== 'ALL' && s.income === 0 && s.serviceCost === 0 && s.policyCost === 0) continue;
-
-                        const vehBalance = s.income - (s.serviceCost + s.policyCost);
-                        const rowColor = vehBalance >= 0 ? '#e6fff2' : '#fff5f5';
+                    resultsArray.forEach(s => {
+                        const rowColor = s.balance >= 0 ? '#e6fff2' : '#fff5f5';
 
                         resultsHtml += `
                             <div class="table-row-sm" style="display: grid; grid-template-columns: 40px 120px 150px 120px 120px 120px 120px 1fr; gap: 10px; padding: 10px; border-bottom: 1px solid #eee; align-items: center; background-color:${rowColor};">
@@ -1895,15 +1980,15 @@
                                 <div style="font-weight:bold; color:#28a745;">${s.income.toFixed(2)}</div>
                                 <div style="color:#dc3545;">${s.serviceCost.toFixed(2)}</div>
                                 <div style="color:#007bff;">${s.policyCost.toFixed(2)}</div>
-                                <div style="font-weight:bold; color:${vehBalance >= 0 ? 'green' : 'red'};">
-                                    ${vehBalance.toFixed(2)}
+                                <div style="font-weight:bold; color:${s.balance >= 0 ? 'green' : 'red'};">
+                                    ${s.balance.toFixed(2)}
                                 </div>
                                 <div style="font-size:0.8em; color:#666;">
-                                    ${vehBalance > 0 ? '✅ OK' : '⚠️ STRATA'}
+                                    ${s.balance > 0 ? '✅ OK' : '⚠️ STRATA'}
                                 </div>
                             </div>
                         `;
-                    }
+                    });
 
                     if (index === 1) {
                         resultsHtml += '<div style="padding:20px; text-align:center;">Brak danych finansowych w wybranym okresie.</div>';
@@ -1935,7 +2020,7 @@
 
                 applyBtn.addEventListener('click', calculateAndShow);
 
-                // Pierwsze uruchomienie (domyślnie Całościowy)
+                // Pierwsze uruchomienie
                 calculateAndShow();
 
             } catch (e) {
@@ -1945,49 +2030,30 @@
 
         async function renderVehicleDocsList() {
             const contentDiv = document.getElementById('docs-content');
-
-            // Grid: Lp, Marka, Model, Rej, Dowód, OC, AC, Badanie, Książka, Faktura
             const gridLayout = "40px 100px 100px 100px 1fr 1fr 1fr 1fr 1fr 1fr";
 
-            // Style dla nagłówka
-            const headerStyle = `display: grid; grid-template-columns: ${gridLayout}; gap: 5px; font-weight: bold; padding: 10px; background: #fff3cd; border-bottom: 2px solid #ccc; font-size: 0.8em; text-align: center; align-items: center;`;
-
             contentDiv.innerHTML = `
-                <div class="table-header-sm" style="${headerStyle}">
+                <div class="table-header-sm" style="display: grid; grid-template-columns: ${gridLayout}; gap: 5px; font-weight: bold; padding: 10px; background: #fff3cd; border-bottom: 2px solid #ccc; font-size: 0.8em; text-align: center; align-items: center;">
                     <div>Lp.</div>
-                    <div>Marka</div>
-                    <div>Model</div>
-                    <div>Nr Rej.</div>
-                    <div>Dowód Rej.</div>
-                    <div>Polisa OC</div>
-                    <div>Polisa AC</div>
-                    <div>Badanie Tech.</div>
-                    <div>Ks. Serwisowa</div>
-                    <div>Faktura Zakupu</div>
+                    ${getSortHeader('Marka', 'marka')}
+                    ${getSortHeader('Model', 'model')}
+                    ${getSortHeader('Nr Rej.', 'registration_number')}
+                    <div>Dowód Rej.</div> <div>Polisa OC</div> <div>Polisa AC</div> <div>Badanie Tech.</div> <div>Ks. Serwisowa</div> <div>Faktura Zakupu</div>
                 </div>
                 <div id="docs-list-items">Ładowanie danych...</div>
             `;
 
             const listDiv = document.getElementById('docs-list-items');
-
             try {
-                // Pobieramy POJAZDY, bo to one teraz trzymają te pliki
                 const response = await fetch(API_BASE + 'vehicles/', { headers: getAuthHeaders() });
-                const vehicles = await response.json();
+                let vehicles = await response.json();
+
+                vehicles = applySort(vehicles); // Sortowanie
 
                 listDiv.innerHTML = '';
-                if (vehicles.length === 0) {
-                    listDiv.innerHTML = '<div style="padding:20px;">Brak pojazdów w bazie.</div>';
-                    return;
-                }
+                if (vehicles.length === 0) { listDiv.innerHTML = '<div style="padding:20px;">Brak pojazdów.</div>'; return; }
 
-                // Funkcja pomocnicza do generowania linku lub "Brak"
-                const fileLink = (url, label) => {
-                    if (url) {
-                        return `<a href="${url}" target="_blank" style="display:block; background:#28a745; color:white; padding:4px; border-radius:4px; text-decoration:none; font-size:0.75em; text-align:center;">⬇ ${label}</a>`;
-                    }
-                    return `<span style="color:#ccc; font-size:0.75em;">- brak -</span>`;
-                };
+                const fileLink = (url, label) => url ? `<a href="${url}" target="_blank" style="display:block; background:#28a745; color:white; padding:4px; border-radius:4px; text-decoration:none; font-size:0.75em; text-align:center;">⬇ ${label}</a>` : `<span style="color:#ccc; font-size:0.75em;">- brak -</span>`;
 
                 vehicles.forEach((v, index) => {
                     const row = document.createElement('div');
@@ -2005,7 +2071,6 @@
                         <div style="font-weight:bold;">${v.marka || '-'}</div>
                         <div>${v.model || '-'}</div>
                         <div style="color:#007bff; font-weight:bold;">${v.registration_number}</div>
-
                         <div>${fileLink(v.scan_registration_card, 'Pobierz')}</div>
                         <div>${fileLink(v.scan_policy_oc, 'Pobierz')}</div>
                         <div>${fileLink(v.scan_policy_ac, 'Pobierz')}</div>
@@ -2013,21 +2078,11 @@
                         <div>${fileLink(v.scan_service_book, 'Pobierz')}</div>
                         <div>${fileLink(v.scan_purchase_invoice, 'Pobierz')}</div>
                     `;
-
-                    // Opcjonalnie: Możemy dodać, że kliknięcie w wiersz otwiera edycję pojazdu, aby wgrać plik
                     row.style.cursor = "pointer";
-                    row.title = "Kliknij, aby edytować pojazd i dodać pliki";
-                    row.onclick = (e) => {
-                        // Nie otwieraj jeśli kliknięto w link pobierania
-                        if(e.target.tagName !== 'A') openModal('vehicles', v.id);
-                    };
-
+                    row.onclick = (e) => { if(e.target.tagName !== 'A') openModal('vehicles', v.id); };
                     listDiv.appendChild(row);
                 });
-
-            } catch (e) {
-                listDiv.innerHTML = `<div class="error">Błąd: ${e.message}</div>`;
-            }
+            } catch (e) { listDiv.innerHTML = `<div class="error">Błąd: ${e.message}</div>`; }
         }
 
          async function renderServiceEvents(filterType = null) {
@@ -2235,20 +2290,18 @@
 
             currentView = 'drivers';
             viewTitle.textContent = 'Użytkownicy (Kierowcy)';
-
-            // ZMIANA: Dodano kolumnę dla Ważności PJ (110px) i dostosowano resztę
-            // Grid: Lp, Kierowca, Email, Firma, Nr PJ, Kat, Ważność PJ, Badania, Akcje
             const gridLayout = "40px 150px 1fr 100px 110px 50px 110px 110px 100px";
 
             mainContent.innerHTML = `
                 <div class="table-header-sm" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; padding: 10px; background: #ebedef; font-weight: bold; border-bottom: 2px solid #ccc; font-size: 0.85em; align-items: center;">
                     <div>Lp.</div>
-                    <div>Kierowca</div>
-                    <div>Email</div>
-                    <div>Firma</div>
-                    <div>Nr Pr. Jazdy</div>
+                    ${getSortHeader('Kierowca', 'first_name')}
+                    ${getSortHeader('Email', 'email')}
+                    ${getSortHeader('Firma', 'company_name')}
+                    ${getSortHeader('Nr Pr. Jazdy', 'numer_prawa_jazdy')}
                     <div>Kat.</div>
-                    <div>Ważność PJ</div> <div>Badania lek.</div>
+                    ${getSortHeader('Ważność PJ', 'data_waznosci_prawa_jazdy')}
+                    ${getSortHeader('Badania lek.', 'data_waznosci_badan')}
                     <div style="text-align: center;">Akcje</div>
                 </div>
                 <div id="data-list">Ładowanie...</div>
@@ -2257,16 +2310,20 @@
             const dataList = document.getElementById('data-list');
 
             try {
-                const response = await fetch(`${API_BASE}drivers/`, {
-                    headers: getAuthHeaders()
+                const response = await fetch(`${API_BASE}drivers/`, { headers: getAuthHeaders() });
+                let data = await response.json();
+
+                // Normalizacja imienia do sortowania (user_name vs first_name)
+                data.forEach(d => {
+                     d.full_name_sort = (d.first_name || d.last_name) ? `${d.first_name} ${d.last_name}` : d.user_name;
                 });
-                const data = await response.json();
+                // Jeśli sortujemy po imieniu, używamy pola pomocniczego, w przeciwnym razie standardowo
+                if(sortState.column === 'first_name') sortState.column = 'full_name_sort';
+
+                data = applySort(data);
 
                 dataList.innerHTML = '';
-                if (data.length === 0) {
-                     dataList.innerHTML = '<div style="padding:20px;">Brak kierowców.</div>';
-                     return;
-                }
+                if (data.length === 0) { dataList.innerHTML = '<div style="padding:20px;">Brak kierowców.</div>'; return; }
 
                 data.forEach((driver, index) => {
                     const row = document.createElement('div');
@@ -2277,14 +2334,9 @@
                     row.style.alignItems = 'center';
                     row.style.padding = '10px';
                     row.style.borderBottom = '1px solid #eee';
-                    row.style.fontSize = '0.85em'; // Lekko mniejsza czcionka dla czytelności
+                    row.style.fontSize = '0.85em';
 
-                    const fName = driver.first_name || '';
-                    const lName = driver.last_name || '';
-                    const fullName = `${fName} ${lName}`.trim();
-                    const displayName = fullName !== '' ? fullName : (driver.user_name || '---');
-
-                    // Kolorowanie dat (czerwony jeśli brak lub stare - opcjonalnie)
+                    const displayName = driver.full_name_sort;
                     const dataBadan = driver.data_waznosci_badan || '---';
                     const dataPJ = driver.data_waznosci_prawa_jazdy || '---';
 
@@ -2295,18 +2347,13 @@
                         <div>${driver.company_name || '<span style="color: #ccc;">-</span>'}</div>
                         <div style="font-family: monospace;">${driver.numer_prawa_jazdy || '---'}</div>
                         <div style="text-align: center;">${driver.kategorie_prawa_jazdy || 'B'}</div>
-
                         <div style="font-weight:bold; color:#333;">${dataPJ}</div>
-
                         <div style="color: ${dataBadan !== '---' ? 'green' : '#666'}; font-weight: bold;">${dataBadan}</div>
                         <div style="text-align: center;">${getActionButtons(driver, 'drivers')}</div>
                     `;
                     dataList.appendChild(row);
                 });
-            } catch (error) {
-                console.error("Błąd ładowania kierowców:", error);
-                dataList.innerHTML = '<div style="color: red; padding: 10px;">Błąd ładowania danych.</div>';
-            }
+            } catch (error) { dataList.innerHTML = '<div style="color: red; padding: 10px;">Błąd ładowania danych.</div>'; }
         }
 
         async function renderHandovers() {
@@ -2409,16 +2456,16 @@
             mainContent.innerHTML = `
                 <div class="table-header-sm" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; font-weight: bold; padding: 10px; background: #ebedef; border-bottom: 2px solid #ccc; align-items: center; font-size: 0.85em;">
                     <div>Lp.</div>
-                    <div>Marka</div>
-                    <div>Model</div>
-                    <div>Typ</div>
-                    <div>Nr Rej.</div>
-                    <div>VIN</div>
-                    <div>Paliwo</div>
-                    <div>Przebieg</div>
-                    <div>Firma</div>
-                    <div>Użytkownik</div>
-                    <div>Status</div>
+                    ${getSortHeader('Marka', 'marka')}
+                    ${getSortHeader('Model', 'model')}
+                    ${getSortHeader('Typ', 'typ_pojazdu')}
+                    ${getSortHeader('Nr Rej.', 'registration_number')}
+                    ${getSortHeader('VIN', 'vin')}
+                    ${getSortHeader('Paliwo', 'fuel_type')}
+                    ${getSortHeader('Przebieg', 'przebieg')}
+                    ${getSortHeader('Firma', 'company_name')}
+                    ${getSortHeader('Użytkownik', 'assigned_user_name')}
+                    ${getSortHeader('Status', 'status')}
                     <div>Uwagi</div>
                     <div style="text-align: center;">Akcje</div>
                 </div>
@@ -2430,7 +2477,10 @@
             try {
                 const response = await fetch(API_BASE + 'vehicles/', { headers: getAuthHeaders() });
                 if (response.status === 401) { handleLogout(); return; }
-                const vehicles = await response.json();
+                let vehicles = await response.json();
+
+                // SORTOWANIE
+                vehicles = applySort(vehicles);
 
                 dataList.innerHTML = '';
                 if (vehicles.length === 0) {
@@ -2575,20 +2625,18 @@
 
             currentView = 'reservations';
             viewTitle.textContent = 'Rezerwacje Pojazdów';
-
-            // Grid: Lp, Imię, Nazwisko, Firma, Typ, Pojazd, Termin, Status, INFO, Akcje
             const gridLayout = "40px 100px 100px 120px 100px 120px 140px 130px 1fr 100px";
 
             mainContent.innerHTML = `
                 <div class="table-header-sm" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; font-weight: bold; padding: 10px; background: #ebedef; border-bottom: 2px solid #ccc; align-items: center;">
                     <div>Lp.</div>
-                    <div>Imię</div>
-                    <div>Nazwisko</div>
-                    <div>Firma</div>
-                    <div>Typ</div>
-                    <div>Pojazd</div>
-                    <div>Termin</div>
-                    <div>Status</div>
+                    ${getSortHeader('Imię', 'first_name')}
+                    ${getSortHeader('Nazwisko', 'last_name')}
+                    ${getSortHeader('Firma', 'company')}
+                    ${getSortHeader('Typ', 'vehicle_type')}
+                    ${getSortHeader('Pojazd', 'assigned_vehicle_display')}
+                    ${getSortHeader('Termin', 'date_from')}
+                    ${getSortHeader('Status', 'status')}
                     <div>Info</div>
                     <div style="text-align: center;">Akcje</div>
                 </div>
@@ -2601,13 +2649,11 @@
                 const response = await fetch(API_BASE + 'reservations/', { headers: getAuthHeaders() });
                 if (response.status === 401) { handleLogout(); return; }
 
-                const data = await response.json();
-                dataList.innerHTML = '';
+                let data = await response.json();
+                data = applySort(data); // SORTOWANIE
 
-                if (data.length === 0) {
-                    dataList.innerHTML = '<div style="padding: 20px;">Brak rezerwacji. Kliknij DODAJ, aby złożyć zamówienie.</div>';
-                    return;
-                }
+                dataList.innerHTML = '';
+                if (data.length === 0) { dataList.innerHTML = '<div style="padding: 20px;">Brak rezerwacji.</div>'; return; }
 
                 data.forEach((item, index) => {
                     const row = document.createElement('div');
@@ -2619,51 +2665,21 @@
                     row.style.borderBottom = '1px solid #eee';
                     row.style.alignItems = 'center';
 
-                    let statusColor = '#333';
-                    let statusBg = '#f0f0f0';
+                    let statusColor = '#333'; let statusBg = '#f0f0f0';
                     if (item.status === 'OCZEKUJACE') { statusColor = '#856404'; statusBg = '#fff3cd'; }
                     if (item.status === 'PRZYJETE') { statusColor = '#004085'; statusBg = '#cce5ff'; }
                     if (item.status === 'ZATWIERDZONE') { statusColor = '#155724'; statusBg = '#d4edda'; }
                     if (item.status === 'ODRZUCONE') { statusColor = '#721c24'; statusBg = '#f8d7da'; }
 
-                    const dOd = item.date_from || '<span style="color:#ccc">---</span>';
-                    const dDo = item.date_to || '<span style="color:#ccc">---</span>';
+                    const dOd = item.date_from || '---'; const dDo = item.date_to || '---';
                     const terminHtml = `<div style="font-size:0.85em; line-height:1.4em;">Od: <b>${dOd}</b><br>Do: <b>${dDo}</b></div>`;
-
                     const typHtml = `<span class="badge" style="background:#e6f7ff; padding: 2px 5px; border-radius:4px; font-size:0.9em;">${item.vehicle_type}</span>`;
+                    let pojazdHtml = item.assigned_vehicle_display ? `<strong style="color: #007bff;">${item.assigned_vehicle_display}</strong>` : '<span style="color: #ccc;">---</span>';
 
-                    let pojazdHtml = '<span style="color: #ccc;">---</span>';
-                    if (item.assigned_vehicle_display) {
-                        pojazdHtml = `<strong style="color: #007bff;">${item.assigned_vehicle_display}</strong>`;
-                    }
-
-                    // --- OBSŁUGA KOLUMNY INFO (Notatka + Link do PDF) ---
-                    let infoContent = '';
-                    if (item.additional_info) {
-                        infoContent += `<div style="font-style:italic; color:#555; margin-bottom:4px;">${item.additional_info}</div>`;
-                    }
-
-                    // Sprawdzamy, czy są załączniki w nowym modelu
-                    if (item.attachments && item.attachments.length > 0) {
-                        infoContent += `<div style="display:flex; flex-wrap:wrap; gap:5px;">`;
-                        item.attachments.forEach(att => {
-                            // Skrócona nazwa pliku (np. ostatnie 10 znaków) lub ikonka
-                            infoContent += `
-                                <a href="${att.file}" target="_blank" title="Pobierz plik"
-                                   style="text-decoration:none; background:#eee; padding:2px 6px; border-radius:4px; font-size:0.8em; color:#333; border:1px solid #ccc;">
-                                   📄 PDF
-                                </a>
-                            `;
-                        });
-                        infoContent += `</div>`;
-                    }
-                    else if (item.scan_agreement) {
-                        // Wsparcie dla starego pola (jeśli jeszcze jakieś dane tam zostały)
-                        infoContent += `<div><a href="${item.scan_agreement}" target="_blank" style="color:blue;">📄 Stary plik</a></div>`;
-                    }
-
-                    if (!infoContent) infoContent = '<span style="color:#ccc;">-</span>';
-                    // ----------------------------------------------------
+                    // Info content (skrócone dla przejrzystości)
+                    let infoContent = item.additional_info ? `<div style="font-style:italic; color:#555;">${item.additional_info}</div>` : '';
+                    if (item.attachments && item.attachments.length > 0) infoContent += '<div>📎 Załączniki</div>';
+                    if (!infoContent) infoContent = '-';
 
                     row.innerHTML = `
                         <div>${index + 1}.</div>
@@ -2673,20 +2689,13 @@
                         <div>${typHtml}</div>
                         <div>${pojazdHtml}</div>
                         <div>${terminHtml}</div>
-                        <div>
-                            <span style="background-color: ${statusBg}; color: ${statusColor}; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85em;">
-                                ${item.status}
-                            </span>
-                        </div>
-                        <div style="font-size: 0.85em; overflow: hidden;">${infoContent}</div>
-
+                        <div><span style="background-color: ${statusBg}; color: ${statusColor}; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85em;">${item.status}</span></div>
+                        <div style="font-size: 0.85em;">${infoContent}</div>
                         <div style="text-align: center;">${getActionButtons(item, 'reservations')}</div>
                     `;
                     dataList.appendChild(row);
                 });
-            } catch (error) {
-                dataList.innerHTML = `<div class="error">Błąd: ${error.message}</div>`;
-            }
+            } catch (error) { dataList.innerHTML = `<div class="error">Błąd: ${error.message}</div>`; }
         }
 
         async function renderRentalHistoryList() {
@@ -2823,13 +2832,16 @@
         async function renderDamageEvents() {
             viewTitle.textContent = 'Zdarzenia Szkodowe i Awarie';
             const token = localStorage.getItem('access_token');
+            // Zdefiniujmy grid layout w jednym miejscu
+            const gridLayout = "50px 120px 1fr 150px 150px 120px";
+
             mainContent.innerHTML = `
-                <div class="table-header" style="grid-template-columns: 50px 120px 1fr 150px 150px 120px;">
+                <div class="table-header" style="display:grid; grid-template-columns: ${gridLayout}; gap:10px; padding:10px; background:#ebedef; font-weight:bold; align-items:center;">
                     <div>Lp.</div>
-                    <div>Nr Rej.</div>
-                    <div>Opis Szkody</div>
-                    <div>Data</div>
-                    <div>Status</div>
+                    ${getSortHeader('Nr Rej.', 'pojazd_nr_rej')}
+                    ${getSortHeader('Opis Szkody', 'opis')}
+                    ${getSortHeader('Data', 'data_zdarzenia')}
+                    ${getSortHeader('Status', 'status_naprawy')}
                     <div>Akcje</div>
                 </div>
                 <div id="data-list">Ładowanie szkód...</div>
@@ -2841,7 +2853,9 @@
                 const response = await fetch('http://127.0.0.1:8000/api/damage_events/', {
                     headers: { 'Authorization': 'Bearer ' + token }
                 });
-                const damages = await response.json();
+                let damages = await response.json();
+
+                damages = applySort(damages); // SORTOWANIE
 
                 dataListDiv.innerHTML = '';
                 damages.forEach((damage, index) => {
@@ -2854,25 +2868,24 @@
 
                     const row = document.createElement('div');
                     row.className = 'table-row';
-                    row.style.gridTemplateColumns = "50px 120px 1fr 150px 150px 120px";
+                    row.style.display = "grid";
+                    row.style.gridTemplateColumns = gridLayout;
+                    row.style.gap = "10px";
+                    row.style.alignItems = "center"; // Ważne dla wyrównania
+
                     row.innerHTML = `
                         <div>${index + 1}.</div>
                         <div>${damage.pojazd_nr_rej}</div>
-
-                        <div class="text-ellipsis" title="${damage.opis}">
-                            ${damage.opis}
-                        </div>
-
+                        <div class="text-ellipsis" title="${damage.opis}">${damage.opis}</div>
                         <div>${damage.data_zdarzenia}</div>
                         <div style="color: ${status.col}; font-weight: bold;">${status.txt}</div>
                         <div>${getActionButtons(damage, 'damages')}</div>
                     `;
                     dataListDiv.appendChild(row);
                 });
-            } catch (err) {
-                dataListDiv.innerHTML = `<p style="color:red;">Błąd: ${err.message}</p>`;
-            }
+            } catch (err) { dataListDiv.innerHTML = `<p style="color:red;">Błąd: ${err.message}</p>`; }
         }
+
          function renderPlaceholder(title) {
              currentView = title;
              viewTitle.textContent = title;
