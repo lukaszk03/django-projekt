@@ -112,6 +112,39 @@ class DamageEventViewSet(viewsets.ModelViewSet):
     queryset = DamageEvent.objects.select_related('pojazd').all()
     serializer_class = DamageEventDto
 
+    # Funkcja pomocnicza: Sprawdza szkody i aktualizuje status auta
+    def _update_vehicle_status(self, vehicle):
+        # Sprawdzamy, czy ten pojazd ma jakiekolwiek OTWARTE szkody
+        # (czyli status 'ZGLOSZONA' lub 'W_NAPRAWIE')
+        ma_aktywne_szkody = DamageEvent.objects.filter(
+            pojazd=vehicle,
+            status_naprawy__in=['ZGLOSZONA', 'W_NAPRAWIE']
+        ).exists()
+
+        if ma_aktywne_szkody:
+            vehicle.status = 'NIESPRAWNY'
+        else:
+            # Jeśli nie ma aktywnych szkód (wszystkie zamknięte lub brak szkód)
+            vehicle.status = 'SPRAWNY'
+
+        vehicle.save()
+
+    # 1. Przy TWORZENIU nowej szkody
+    def perform_create(self, serializer):
+        damage = serializer.save()
+        self._update_vehicle_status(damage.pojazd)
+
+    # 2. Przy EDYCJI szkody (np. zmiana statusu na ZAMKNIETA)
+    def perform_update(self, serializer):
+        damage = serializer.save()
+        self._update_vehicle_status(damage.pojazd)
+
+    # 3. Przy USUWANIU szkody (np. usunięcie błędnego wpisu)
+    def perform_destroy(self, instance):
+        vehicle = instance.pojazd
+        instance.delete()  # Najpierw usuwamy szkodę
+        self._update_vehicle_status(vehicle)  # Potem przeliczamy status auta
+
 # 5. NOWY WIDOK DLA POLIS
 class InsurancePolicyViewSet(viewsets.ModelViewSet):
     queryset = InsurancePolicy.objects.select_related('pojazd').all()
