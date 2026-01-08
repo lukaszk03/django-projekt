@@ -1306,13 +1306,22 @@
 
             // 6. REZERWACJE (PODMIEŃ CAŁY TEN BLOK)
             else if (viewName === 'reservations') {
-                // 1. POBIERANIE LISTY POJAZDÓW
+                // 1. POBIERANIE LISTY POJAZDÓW (Zaktualizowane o status)
                 let vehicleOptions = '<option value="">-- Brak / Dowolny --</option>';
                 try {
                     const vehicles = await fetchVehicles();
                     vehicleOptions += vehicles.map(v => {
                         const isSelected = (record && record.assigned_vehicle === v.id) ? 'selected' : '';
-                        return `<option value="${v.id}" ${isSelected}>${v.registration_number} (${v.marka} ${v.model})</option>`;
+
+                        // Dodajemy ikonkę statusu dla czytelności
+                        let statusIcon = '❓';
+                        if (v.status === 'SPRAWNY') statusIcon = '✅';
+                        else if (v.status === 'NIESPRAWNY') statusIcon = '❌';
+
+                        // Wyświetlamy: Rejestracja (Model) [IKONA STATUS]
+                        return `<option value="${v.id}" ${isSelected}>
+                            ${v.registration_number} (${v.marka} ${v.model}) — ${statusIcon} ${v.status}
+                        </option>`;
                     }).join('');
                 } catch (e) { console.error(e); }
 
