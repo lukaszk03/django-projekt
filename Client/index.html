@@ -3239,9 +3239,16 @@
         async function updateNotificationBadge() {
             const alerts = await getAlertsData();
             const badge = document.getElementById('notif-badge-count');
-            if (alerts.length > 0) {
+
+            // Pobieramy liczbę ostatnio widzianych powiadomień
+            const lastSeenCount = parseInt(localStorage.getItem('last_seen_alerts_count') || '0');
+            const currentCount = alerts.length;
+
+            // Pokazuj kropkę TYLKO jeśli jest więcej błędów niż ostatnio widzieliśmy
+            // LUB jeśli użytkownik nigdy ich nie widział (lastSeenCount == 0) a błędy są.
+            if (currentCount > 0 && currentCount > lastSeenCount) {
                 badge.style.display = 'inline-block';
-                badge.textContent = alerts.length;
+                badge.textContent = currentCount; // Pokazuje liczbę wszystkich aktywnych
             } else {
                 badge.style.display = 'none';
             }
@@ -3251,13 +3258,17 @@
         async function renderNotifications() {
             currentView = 'notifications';
             viewTitle.textContent = 'Centrum Powiadomień';
-            document.getElementById('add-btn').style.display = 'none'; // Ukryj przycisk dodawania
+            document.getElementById('add-btn').style.display = 'none';
 
             const contentDiv = document.getElementById('main-content');
             contentDiv.innerHTML = '<div style="text-align:center; padding:20px;">Sprawdzanie terminów...</div>';
 
             const alerts = await getAlertsData();
-            updateNotificationBadge(); // Przy okazji odśwież licznik
+
+            // --- 1. RESETOWANIE LICZNIKA (ZNIKANIE KROPKI) ---
+            // Zapisujemy, że użytkownik widział tyle powiadomień, ile jest teraz
+            localStorage.setItem('last_seen_alerts_count', alerts.length);
+            updateNotificationBadge(); // Odświeżamy kropkę (zniknie)
 
             if (alerts.length === 0) {
                 contentDiv.innerHTML = `
@@ -3270,28 +3281,57 @@
                 return;
             }
 
-            let html = '<div style="max-width: 800px; margin: 0 auto;">';
+            // --- 2. GRUPOWANIE NA DZIAŁY ---
+            const insuranceAlerts = alerts.filter(a => a.view === 'policies');
+            const techAlerts = alerts.filter(a => a.view === 'inspection' || a.view === 'repairs' || a.view === 'tech_inspections');
 
-            alerts.forEach(a => {
-                const icon = a.type === 'CRITICAL' ? '<i class="fas fa-exclamation-circle" style="color:#dc3545; font-size:1.5em;"></i>' : '<i class="fas fa-clock" style="color:#ffc107; font-size:1.5em;"></i>';
-                const btnAction = `<button onclick="openModal('${a.view}', ${a.id})" style="margin-left:auto; padding:5px 10px; cursor:pointer;">Szczegóły</button>`;
-
-                html += `
-                    <div class="alert-card ${a.type === 'CRITICAL' ? 'alert-critical' : 'alert-warning'}">
-                        <div style="display:flex; align-items:center; gap:15px;">
-                            ${icon}
-                            <div>
-                                <div style="font-weight:bold; font-size:1.1em;">${a.reg}</div>
-                                <div>${a.msg}</div>
-                                <div style="font-size:0.85em; color:#666;">Termin: ${a.date}</div>
-                            </div>
-                        </div>
-                        ${btnAction}
-                    </div>
+            // Funkcja pomocnicza do generowania sekcji HTML
+            const renderSection = (title, icon, items, colorClass) => {
+                if (items.length === 0) return '';
+                let html = `
+                    <div style="margin-bottom: 30px;">
+                        <h3 style="border-bottom: 2px solid #ccc; padding-bottom: 10px; color: #2c3e50;">
+                            <i class="fas ${icon}" style="margin-right:10px;"></i> ${title}
+                        </h3>
                 `;
-            });
-            html += '</div>';
-            contentDiv.innerHTML = html;
+
+                items.forEach(a => {
+                    const statusIcon = a.type === 'CRITICAL'
+                        ? '<i class="fas fa-exclamation-circle" style="color:#dc3545; font-size:1.5em;"></i>'
+                        : '<i class="fas fa-clock" style="color:#ffc107; font-size:1.5em;"></i>';
+
+                    // --- 3. BRAK PRZYCISKU EDYCJI ---
+                    // Generujemy kafelek TYLKO z informacją, bez buttona <button onclick="openModal...">
+
+                    html += `
+                        <div class="alert-card ${a.type === 'CRITICAL' ? 'alert-critical' : 'alert-warning'}" style="cursor: default;">
+                            <div style="display:flex; align-items:center; gap:15px; width: 100%;">
+                                ${statusIcon}
+                                <div>
+                                    <div style="font-weight:bold; font-size:1.1em;">${a.reg}</div>
+                                    <div style="font-size:0.95em;">${a.msg}</div>
+                                    <div style="font-size:0.85em; color:#666; margin-top:4px;">
+                                        📅 Termin: <strong>${a.date}</strong>
+                                    </div>
+                                </div>
+                            </div>
+                            </div>
+                    `;
+                });
+                html += '</div>';
+                return html;
+            };
+
+            let finalHtml = '<div style="max-width: 800px; margin: 0 auto;">';
+
+            // Renderujemy sekcję Ubezpieczeń
+            finalHtml += renderSection('Dział Ubezpieczeń (Polisy)', 'fa-file-contract', insuranceAlerts);
+
+            // Renderujemy sekcję Techniczną
+            finalHtml += renderSection('Dział Techniczny (Serwis)', 'fa-wrench', techAlerts);
+
+            finalHtml += '</div>';
+            contentDiv.innerHTML = finalHtml;
         }
 
         function checkAuthentication() {
