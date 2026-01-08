@@ -178,7 +178,7 @@ def register_view(request):
     username = request.data.get('username')
     password = request.data.get('password')
     email = request.data.get('email')
-    rola = request.data.get('rola', 'EMPLOYEE')
+    rola = 'DRIVER'
     first_name = request.data.get('first_name', '')
     last_name = request.data.get('last_name', '')
 
@@ -196,6 +196,9 @@ def register_view(request):
         first_name=first_name, 
         last_name=last_name
     )
+
+    from .models import Driver
+    Driver.objects.create(user=user, numer_prawa_jazdy="", kategorie_prawa_jazdy="B")
 
     return Response({'detail': 'Konto zostało utworzone. Możesz się zalogować.'}, status=status.HTTP_201_CREATED)
 

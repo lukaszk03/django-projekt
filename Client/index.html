@@ -448,12 +448,8 @@
                 <input type="text" id="reg_username" placeholder="Login" required>
                 <input type="email" id="reg_email" placeholder="E-mail" required>
                 <input type="password" id="reg_password" placeholder="Hasło" required>
+                <input type="password" id="reg_password_confirm" placeholder="Powtórz hasło" required>
 
-                <select id="reg_role">
-                    <option value="EMPLOYEE">Pracownik</option>
-                    <option value="DRIVER">Kierowca</option>
-                    <option value="MANAGER">Menedżer Floty</option>
-                </select>
 
                 <button onclick="handleRegister()">ZAREJESTRUJ SIĘ</button>
 
@@ -783,18 +779,27 @@
             const username = document.getElementById('reg_username').value;
             const email = document.getElementById('reg_email').value;
             const password = document.getElementById('reg_password').value;
-            const rola = document.getElementById('reg_role').value;
+
+            // 1. Pobieramy powtórzone hasło
+            const passwordConfirm = document.getElementById('reg_password_confirm').value;
+
             const first_name = document.getElementById('reg_first_name').value;
             const last_name = document.getElementById('reg_last_name').value;
             const errorElem = document.getElementById('register-error');
 
             errorElem.textContent = "";
 
+            // 2. SPRAWDZAMY ZGODNOŚĆ HASEŁ
+            if (password !== passwordConfirm) {
+                errorElem.textContent = "Hasła muszą być identyczne!";
+                return; // Przerywamy funkcję, nie wysyłamy do serwera
+            }
+
             try {
                 const response = await fetch('http://127.0.0.1:8000/api/register/', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, email, password, rola, first_name, last_name })
+                    body: JSON.stringify({ username, email, password, first_name, last_name })
                 });
 
                 const data = await response.json();
