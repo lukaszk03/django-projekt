@@ -2149,17 +2149,19 @@
             currentView = 'drivers';
             viewTitle.textContent = 'Użytkownicy (Kierowcy)';
 
-            const gridLayout = "40px 150px 1fr 120px 120px 60px 110px 100px";
+            // ZMIANA: Dodano kolumnę dla Ważności PJ (110px) i dostosowano resztę
+            // Grid: Lp, Kierowca, Email, Firma, Nr PJ, Kat, Ważność PJ, Badania, Akcje
+            const gridLayout = "40px 150px 1fr 100px 110px 50px 110px 110px 100px";
 
             mainContent.innerHTML = `
-                <div class="table-header" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; padding: 10px; background: #ebedef; font-weight: bold; border-bottom: 2px solid #ccc;">
+                <div class="table-header-sm" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; padding: 10px; background: #ebedef; font-weight: bold; border-bottom: 2px solid #ccc; font-size: 0.85em; align-items: center;">
                     <div>Lp.</div>
                     <div>Kierowca</div>
                     <div>Email</div>
                     <div>Firma</div>
                     <div>Nr Pr. Jazdy</div>
                     <div>Kat.</div>
-                    <div>Badania lek.</div>
+                    <div>Ważność PJ</div> <div>Badania lek.</div>
                     <div style="text-align: center;">Akcje</div>
                 </div>
                 <div id="data-list">Ładowanie...</div>
@@ -2174,33 +2176,42 @@
                 const data = await response.json();
 
                 dataList.innerHTML = '';
+                if (data.length === 0) {
+                     dataList.innerHTML = '<div style="padding:20px;">Brak kierowców.</div>';
+                     return;
+                }
+
                 data.forEach((driver, index) => {
                     const row = document.createElement('div');
-                    row.className = 'table-row';
+                    row.className = 'table-row-sm';
                     row.style.display = 'grid';
                     row.style.gridTemplateColumns = gridLayout;
                     row.style.gap = '10px';
                     row.style.alignItems = 'center';
                     row.style.padding = '10px';
                     row.style.borderBottom = '1px solid #eee';
+                    row.style.fontSize = '0.85em'; // Lekko mniejsza czcionka dla czytelności
 
                     const fName = driver.first_name || '';
                     const lName = driver.last_name || '';
                     const fullName = `${fName} ${lName}`.trim();
-
                     const displayName = fullName !== '' ? fullName : (driver.user_name || '---');
 
+                    // Kolorowanie dat (czerwony jeśli brak lub stare - opcjonalnie)
                     const dataBadan = driver.data_waznosci_badan || '---';
-                    const kolorBadan = (dataBadan !== '---') ? 'green' : '#666';
+                    const dataPJ = driver.data_waznosci_prawa_jazdy || '---';
 
                     row.innerHTML = `
                         <div>${index + 1}.</div>
                         <div style="font-weight: bold;">${displayName}</div>
-                        <div style="font-size: 0.9em; overflow: hidden; text-overflow: ellipsis;">${driver.email || '---'}</div>
-                        <div>${driver.company_name || '<span style="color: #ccc;">Brak</span>'}</div>
+                        <div style="font-size: 0.9em; overflow: hidden; text-overflow: ellipsis;" title="${driver.email}">${driver.email || '---'}</div>
+                        <div>${driver.company_name || '<span style="color: #ccc;">-</span>'}</div>
                         <div style="font-family: monospace;">${driver.numer_prawa_jazdy || '---'}</div>
-                        <div style="text-align: center;">${driver.kategorie_prawa_jazdy || '---'}</div>
-                        <div style="color: ${kolorBadan}; font-weight: bold; font-size: 0.85em;">${dataBadan}</div>
+                        <div style="text-align: center;">${driver.kategorie_prawa_jazdy || 'B'}</div>
+
+                        <div style="font-weight:bold; color:#333;">${dataPJ}</div>
+
+                        <div style="color: ${dataBadan !== '---' ? 'green' : '#666'}; font-weight: bold;">${dataBadan}</div>
                         <div style="text-align: center;">${getActionButtons(driver, 'drivers')}</div>
                     `;
                     dataList.appendChild(row);

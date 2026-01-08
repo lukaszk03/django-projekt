@@ -92,7 +92,7 @@ class DriverDto(serializers.ModelSerializer):
         fields = [
             'id', 'user', 'user_name', 'first_name', 'last_name', 'email',
             'numer_prawa_jazdy', 'kategorie_prawa_jazdy',
-            'data_waznosci_badan', 'company', 'company_name'
+            'data_waznosci_prawa_jazdy', 'data_waznosci_badan', 'company', 'company_name'
         ]
 
 # 3. SZKODY
