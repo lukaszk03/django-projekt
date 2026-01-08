@@ -29,69 +29,118 @@ class VehicleViewSet(viewsets.ModelViewSet):
         vehicle = self.get_object()
         events = []
 
-        # 1. Przekazania (Kto i kiedy jeździł)
+        # 1. Przekazania (HANDOVER) - Ciemny Niebieski
         for h in vehicle.handovers.all():
             kierowca = f"{h.kierowca.user.first_name} {h.kierowca.user.last_name}"
-            # Ustalamy datę końca (jeśli jest w trakcie, bierzemy dzisiejszą dla sortowania lub null)
-            desc = f"Kierowca: {kierowca} ({h.kierowca.company.nazwa if h.kierowca.company else 'Brak firmy'})."
+            firma = h.kierowca.company.nazwa if h.kierowca.company else 'Brak firmy'
+
+            # Opis Wydania
+            desc_start = f"Kierowca: {kierowca} ({firma})."
+            desc_start += f"\nStan licznika: {h.przebieg_start} km."
+            desc_start += f" Paliwo: {h.paliwo_start}%."
             if h.uwagi:
-                desc += f" Uwagi: {h.uwagi}"
+                desc_start += f"\nUwagi: {h.uwagi}"
 
             events.append({
                 'date': h.data_wydania,
                 'type': 'HANDOVER',
                 'title': 'Wydanie Pojazdu',
-                'description': desc,
+                'description': desc_start,
                 'icon': 'fa-key',
-                'color': '#28a745'  # Zielony
+                'color': '#0d47a1'  # <--- CIEMNY NIEBIESKI (Wydanie)
             })
 
-            # Jeśli auto zostało zwrócone, dodajemy osobny wpis o zwrocie
+            # Opis Zwrotu (Zostawiamy turkusowy/morski dla odróżnienia, lub też niebieski)
             if h.data_zwrotu:
+                desc_stop = f"Zwrot od: {kierowca}."
+                desc_stop += f"\nStan licznika: {h.przebieg_stop} km."
+                desc_stop += f" Paliwo: {h.paliwo_stop}%."
+
+                if h.calkowity_koszt and float(h.calkowity_koszt) > 0:
+                    desc_stop += f"\nRozliczenie: {h.calkowity_koszt} PLN."
+
                 events.append({
                     'date': h.data_zwrotu,
                     'type': 'RETURN',
                     'title': 'Zwrot Pojazdu',
-                    'description': f"Zwrot od: {kierowca}. Przebieg: {h.przebieg_stop or '-'} km.",
+                    'description': desc_stop,
                     'icon': 'fa-check-circle',
-                    'color': '#17a2b8'  # Niebieski
+                    'color': '#17a2b8'  # Turkusowy (pozostawiamy dla czytelności zwrotu)
                 })
 
-        # 2. Szkody
+        # 2. Szkody - Ciemniejszy Czerwony
         for d in vehicle.damage_history.all():
+            szkoda_desc = d.opis
+            if d.szacowany_koszt and float(d.szacowany_koszt) > 0:
+                szkoda_desc += f"\nSzacowany koszt: {d.szacowany_koszt} PLN"
+
             events.append({
                 'date': d.data_zdarzenia,
                 'type': 'DAMAGE',
-                'title': f'Szkoda: {d.status_naprawy}',
-                'description': d.opis,
-                'icon': 'fa-car-crash',
-                'color': '#dc3545'  # Czerwony
+                'title': f'Szkoda ({d.get_status_naprawy_display()})',
+                'description': szkoda_desc,
+                'icon': 'fa-car-burst',
+                'color': '#8B0000'  # <--- CIEMNY CZERWONY (DarkRed)
             })
 
-        # 3. Serwisy / Przeglądy
+        # 3. Serwisy / Przeglądy / Naprawy (Kolory jak w Terminarzu)
         for s in vehicle.service_history.all():
+            service_desc = s.opis
+            if s.koszt and float(s.koszt) > 0:
+                service_desc += f"\nKoszt: {s.koszt} PLN"
+
+            # Logika kolorów zgodna z Terminarzem
+            if s.typ_zdarzenia == 'PRZEGLAD':
+                color = '#28a745'  # ZIELONY (Przegląd)
+                icon = 'fa-check-double'
+            elif s.typ_zdarzenia == 'NAPRAWA':
+                color = '#dc3545'  # CZERWONY (Naprawa - jaśniejszy niż szkoda)
+                icon = 'fa-tools'
+            elif s.typ_zdarzenia == 'BADANIE_TECH':
+                color = '#ffc107'  # ŻÓŁTY (Badanie Tech)
+                icon = 'fa-clipboard-check'
+            else:
+                color = '#6c757d'  # Szary (Inne)
+                icon = 'fa-wrench'
+
             events.append({
                 'date': s.data_serwisu,
                 'type': 'SERVICE',
-                'title': f"Serwis: {s.get_typ_zdarzenia_display()}",
-                'description': f"{s.opis} (Koszt: {s.koszt} PLN)",
-                'icon': 'fa-wrench',
-                'color': '#ffc107'  # Żółty
+                'title': f"{s.get_typ_zdarzenia_display()}",
+                'description': service_desc,
+                'icon': icon,
+                'color': color
             })
 
-        # 4. Polisy (Data ważności OC jako zdarzenie)
+        # 4. Polisy - Niebieski (jak w Terminarzu)
         for p in vehicle.policies.all():
+            policy_desc = f"Ubezpieczyciel: {p.ubezpieczyciel}\nNr: {p.numer_polisy}"
+            if p.koszt and float(p.koszt) > 0:
+                policy_desc += f"\nKoszt: {p.koszt} PLN"
+
+            # OC
             events.append({
                 'date': p.data_waznosci_oc,
                 'type': 'POLICY',
-                'title': f"Koniec Polisy OC ({p.ubezpieczyciel})",
-                'description': f"Nr polisy: {p.numer_polisy}",
+                'title': f"Koniec Polisy OC",
+                'description': policy_desc,
                 'icon': 'fa-file-contract',
-                'color': '#6c757d'  # Szary
+                'color': '#007bff'  # <--- NIEBIESKI (Polisa, jak w kalendarzu)
             })
 
+            # AC (jeśli jest)
+            if p.data_waznosci_ac:
+                events.append({
+                    'date': p.data_waznosci_ac,
+                    'type': 'POLICY',
+                    'title': f"Koniec Polisy AC",
+                    'description': policy_desc,
+                    'icon': 'fa-shield-alt',
+                    'color': '#007bff'  # <--- NIEBIESKI
+                })
+
         # Sortowanie po dacie (od najnowszych)
-        events.sort(key=lambda x: x['date'], reverse=True)
+        events.sort(key=lambda x: str(x['date']), reverse=True)
 
         return Response(events)
 
