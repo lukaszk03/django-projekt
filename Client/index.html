@@ -1807,7 +1807,7 @@
                 // 2. PRZYGOTOWANIE UI FILTRÓW
                 const today = new Date();
                 const currentYear = today.getFullYear();
-                const currentMonth = today.getMonth(); // 0-11
+                const currentMonth = today.getMonth();
 
                 const htmlFilters = `
                     <div style="background:white; padding:15px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.1); margin-bottom:20px; display:flex; gap:15px; align-items:center; flex-wrap:wrap;">
@@ -1863,29 +1863,20 @@
                         if (!dateString) return false;
                         if (mode === 'ALL') return true;
                         const d = new Date(dateString);
-                        if (mode === 'YEAR') {
-                            return d.getFullYear() === year;
-                        }
-                        if (mode === 'MONTH') {
-                            return d.getFullYear() === year && d.getMonth() === month;
-                        }
+                        if (mode === 'YEAR') { return d.getFullYear() === year; }
+                        if (mode === 'MONTH') { return d.getFullYear() === year && d.getMonth() === month; }
                         return true;
                     };
 
                     const stats = {};
-                    let totalService = 0;
-                    let totalPolicy = 0;
-                    let totalIncome = 0;
+                    let totalService = 0, totalPolicy = 0, totalIncome = 0;
 
                     vehicles.forEach(v => {
                         stats[v.id] = {
                             reg: v.registration_number,
                             marka: v.marka,
                             model: v.model,
-                            serviceCost: 0,
-                            policyCost: 0,
-                            income: 0,
-                            balance: 0
+                            serviceCost: 0, policyCost: 0, income: 0, balance: 0
                         };
                     });
 
@@ -1914,22 +1905,23 @@
                         }
                     });
 
-                    // Konwersja na tablicę
+                    // Konwersja na tablicę i sortowanie
                     let resultsArray = Object.values(stats).map(s => {
                         s.balance = s.income - (s.serviceCost + s.policyCost);
                         return s;
                     });
 
-                    // Filtrowanie pustych (jeśli nie wybrano "Całościowy")
                     if (mode !== 'ALL') {
                         resultsArray = resultsArray.filter(s => s.income !== 0 || s.serviceCost !== 0 || s.policyCost !== 0);
                     }
-
-                    // --- SORTOWANIE ---
                     resultsArray = applySort(resultsArray);
 
                     const totalExpense = totalService + totalPolicy;
                     const balance = totalIncome - totalExpense;
+
+                    // --- ZMIANA: DEFINICJA SIATKI NA CAŁĄ SZEROKOŚĆ (fr zamiast px) ---
+                    // 50px (Lp), 1.2fr (Rej), 2fr (Pojazd - szerszy), reszta po 1fr
+                    const gridLayout = "50px 1.2fr 2fr 1fr 1fr 1fr 1fr 1fr";
 
                     // --- GENEROWANIE HTML ---
                     let resultsHtml = `
@@ -1955,7 +1947,8 @@
                         </div>
 
                         <h3 style="margin-bottom:10px; color:#34495e;">Szczegóły Pojazdów</h3>
-                        <div class="table-header-sm" style="display: grid; grid-template-columns: 40px 120px 150px 120px 120px 120px 120px 1fr; gap: 10px; font-weight: bold; padding: 10px; background: #ebedef; border-bottom: 2px solid #ccc;">
+
+                        <div class="table-header-sm" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; font-weight: bold; padding: 10px; background: #ebedef; border-bottom: 2px solid #ccc;">
                             <div>Lp.</div>
                             ${getSortHeader('Nr Rej.', 'reg')}
                             ${getSortHeader('Pojazd', 'model')}
@@ -1973,7 +1966,7 @@
                         const rowColor = s.balance >= 0 ? '#e6fff2' : '#fff5f5';
 
                         resultsHtml += `
-                            <div class="table-row-sm" style="display: grid; grid-template-columns: 40px 120px 150px 120px 120px 120px 120px 1fr; gap: 10px; padding: 10px; border-bottom: 1px solid #eee; align-items: center; background-color:${rowColor};">
+                            <div class="table-row-sm" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; padding: 10px; border-bottom: 1px solid #eee; align-items: center; background-color:${rowColor};">
                                 <div>${index++}.</div>
                                 <div style="font-weight:bold;">${s.reg}</div>
                                 <div style="font-size:0.9em;">${s.marka} ${s.model}</div>
@@ -1998,7 +1991,7 @@
                     document.getElementById('settlements_results').innerHTML = resultsHtml;
                 };
 
-                // 4. OBSŁUGA ZDARZEŃ (Zmiana typu raportu pokazuje/ukrywa pola)
+                // 4. OBSŁUGA ZDARZEŃ
                 const filterModeSelect = document.getElementById('filter_mode');
                 const yearContainer = document.getElementById('filter_year_container');
                 const monthContainer = document.getElementById('filter_month_container');
@@ -2019,8 +2012,6 @@
                 });
 
                 applyBtn.addEventListener('click', calculateAndShow);
-
-                // Pierwsze uruchomienie
                 calculateAndShow();
 
             } catch (e) {
