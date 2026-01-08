@@ -1731,8 +1731,43 @@
                     loadView(currentView);
                 } else {
                     const errorData = await response.json();
-                    modalError.textContent = `Błąd: ${JSON.stringify(errorData)}`;
+
+                    // --- FORMATOWANIE BŁĘDÓW ---
+                    let readableError = "";
+
+                    // 1. Sprawdzamy błędy ogólne (np. konflikt rezerwacji)
+                    if (errorData.non_field_errors) {
+                        readableError = errorData.non_field_errors.join('<br>');
+                    }
+                    // 2. Sprawdzamy błędy konkretnego pola (np. brak daty)
+                    else {
+                        // Tworzymy listę błędów dla pól
+                        readableError = Object.entries(errorData).map(([key, msgs]) => {
+                            // Tłumaczenie nazw pól na czytelniejsze (opcjonalne)
+                            let fieldLabel = key;
+                            if(key === 'date_from') fieldLabel = 'Data Od';
+                            if(key === 'date_to') fieldLabel = 'Data Do';
+                            if(key === 'assigned_vehicle') fieldLabel = 'Pojazd';
+                            if(key === 'driver') fieldLabel = 'Kierowca';
+                            if(key === 'detail') return msgs; // Błąd ogólny (np. brak uprawnień)
+
+                            const msgText = Array.isArray(msgs) ? msgs.join(', ') : msgs;
+                            return `<strong>${fieldLabel}:</strong> ${msgText}`;
+                        }).join('<br>');
+                    }
+
+                    // Wyświetlamy ładny komunikat (czerwona ramka)
+                    modalError.style.height = 'auto'; // Resetujemy stałą wysokość, żeby zmieścił się tekst
+                    modalError.style.color = 'inherit'; // Resetujemy kolor tekstu (stylujemy divem niżej)
+
+                    modalError.innerHTML = `
+                        <div style="background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; padding: 10px; border-radius: 5px; font-size: 0.9em; display: flex; align-items: center; gap: 10px;">
+                            <i class="fas fa-exclamation-triangle" style="font-size: 1.2em;"></i>
+                            <div>${readableError}</div>
+                        </div>
+                    `;
                 }
+
             } catch (error) {
                 console.error("Błąd handleSave:", error);
                 if (modalError) modalError.textContent = "Wystąpił błąd po stronie przeglądarki.";

@@ -260,6 +260,52 @@ class ReservationDto(serializers.ModelSerializer):
         # 3. Standardowa aktualizacja reszty pól
         return super().update(instance, validated_data)
 
+    def validate(self, data):
+        """
+        Sprawdza, czy pojazd nie jest zajęty w wybranym terminie.
+        """
+        # 1. Pobieramy dane z formularza (lub z instancji przy częściowej aktualizacji)
+        assigned_vehicle = data.get('assigned_vehicle')
+        date_from = data.get('date_from')
+        date_to = data.get('date_to')
+
+        # Przy edycji (PATCH/PUT) musimy uzupełnić brakujące dane z istniejącego rekordu
+        if self.instance:
+            if not assigned_vehicle: assigned_vehicle = self.instance.assigned_vehicle
+            if not date_from: date_from = self.instance.date_from
+            if not date_to: date_to = self.instance.date_to
+
+        # Sprawdzamy logikę dat
+        if date_from and date_to and date_from > date_to:
+            raise serializers.ValidationError("Data 'Do' nie może być wcześniejsza niż data 'Od'.")
+
+        # 2. Główna walidacja dostępności pojazdu
+        if assigned_vehicle:
+            # Szukamy konfliktów w bazie
+            # Konflikt jest wtedy, gdy:
+            # (NowyStart <= StaryKoniec) ORAZ (NowyKoniec >= StaryStart)
+            # Wykluczamy rezerwacje ODRZUCONE, bo one nie blokują auta.
+            conflicts = Reservation.objects.filter(
+                assigned_vehicle=assigned_vehicle,
+                date_from__lte=date_to,
+                date_to__gte=date_from
+            ).exclude(status='ODRZUCONE')
+
+            # Jeśli edytujemy istniejącą rezerwację, musimy wykluczyć ją samą z porównania
+            if self.instance:
+                conflicts = conflicts.exclude(id=self.instance.id)
+
+            if conflicts.exists():
+                # Pobieramy szczegóły konfliktu, żeby wyświetlić ładny komunikat
+                collision = conflicts.first()
+                msg = (
+                    f"Pojazd {assigned_vehicle.registration_number} jest już zajęty w terminie "
+                    f"{collision.date_from} - {collision.date_to} (Rezerwacja ID: {collision.id})."
+                )
+                raise serializers.ValidationError(msg)
+
+        return data
+
 
 class VehicleDocumentDto(serializers.ModelSerializer):
     vehicle_reg = serializers.ReadOnlyField(source='vehicle.registration_number')
