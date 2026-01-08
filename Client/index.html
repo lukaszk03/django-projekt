@@ -204,6 +204,51 @@
             gap: 8px;
             transition: background 0.2s;
         }
+
+        /* --- STYLY DLA POWIADOMIEŃ --- */
+        .btn-notif {
+            background: none;
+            border: none;
+            font-size: 1.4em;
+            cursor: pointer;
+            position: relative;
+            color: #555;
+            margin-right: 15px; /* Odstęp od wyszukiwarki */
+            transition: color 0.3s;
+        }
+        .btn-notif:hover { color: #007bff; }
+
+        /* Czerwona kropka z licznikiem */
+        .notif-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background-color: #dc3545; /* Czerwony */
+            color: white;
+            font-size: 0.6em;
+            font-weight: bold;
+            padding: 2px 5px;
+            border-radius: 50%;
+            min-width: 15px;
+            display: none; /* Domyślnie ukryte, pokażemy jak będą alerty */
+        }
+
+        /* Styl kafelka powiadomienia na liście */
+        .alert-card {
+            background: white;
+            border-left: 5px solid #ccc;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .alert-critical { border-left-color: #dc3545; background-color: #fff5f5; } /* Przeterminowane */
+        .alert-warning { border-left-color: #ffc107; background-color: #fffbf0; } /* Zbliżające się */
+
+
         .btn-add:hover { background-color: #1abc9c; }
 
         .menu-subitem:hover, .menu-subitem.active { background-color: #f0f8ff; color: #007bff; }
@@ -533,9 +578,14 @@
                     <h1 id="view-title">Pojazdy</h1>
 
                     <div style="display: flex; align-items: center;">
+
+                        <button class="btn-notif" onclick="renderNotifications()" title="Powiadomienia">
+                            <i class="fas fa-bell"></i>
+                            <span id="notif-badge-count" class="notif-badge">0</span>
+                        </button>
                         <div style="display: flex; gap: 10px; margin-right: 10px;">
-                            <input type="text" id="table-search" placeholder="Szukaj..." onkeyup="filterTable()"
-                                   style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 200px;">
+                            <input type="text" id="table-search" placeholder="Szukaj..."
+                                style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 200px;">
 
                             <button class="btn-add" id="add-btn">➕ DODAJ</button>
                         </div>
@@ -3097,6 +3147,140 @@
             });
         });
 
+        async function getAlertsData() {
+            const headers = getAuthHeaders();
+            let alerts = [];
+            let alertDays = 7; // Domyślnie
+
+            try {
+                // 1. Pobierz ustawienia globalne (dni wyprzedzenia)
+                const settingsRes = await fetch(API_BASE + 'settings/', { headers });
+                if (settingsRes.ok) {
+                    const settings = await settingsRes.json();
+                    alertDays = settings.alert_days || 7;
+                }
+
+                // 2. Pobierz dane
+                const [policies, services] = await Promise.all([
+                    fetch(API_BASE + 'policies/', { headers }).then(r => r.json()),
+                    fetch(API_BASE + 'service_events/', { headers }).then(r => r.json())
+                ]);
+
+                const today = new Date();
+                today.setHours(0,0,0,0);
+
+                const warningDate = new Date();
+                warningDate.setDate(today.getDate() + alertDays); // Data za X dni
+
+                // A. SPRAWDZANIE POLIS (OC i AC)
+                policies.forEach(p => {
+                    // Funkcja pomocnicza
+                    const checkDate = (dateStr, type) => {
+                        if (!dateStr) return;
+                        const d = new Date(dateStr);
+
+                        if (d < today) {
+                            alerts.push({ type: 'CRITICAL', msg: `Polisa ${type} wygasła!`, date: dateStr, reg: p.pojazd_nr_rej, id: p.id, view: 'policies' });
+                        } else if (d <= warningDate) {
+                            const diff = Math.ceil((d - today) / (1000 * 60 * 60 * 24));
+                            alerts.push({ type: 'WARNING', msg: `Polisa ${type} wygasa za ${diff} dni`, date: dateStr, reg: p.pojazd_nr_rej, id: p.id, view: 'policies' });
+                        }
+                    };
+                    checkDate(p.data_waznosci_oc, 'OC');
+                    checkDate(p.data_waznosci_ac, 'AC');
+                });
+
+                // B. SPRAWDZANIE TERMINÓW BADAŃ I PRZEGLĄDÓW
+                // Filtrujemy tylko przyszłe zdarzenia lub te z dzisiaj
+                services.forEach(s => {
+                    if (!['BADANIE_TECH', 'PRZEGLAD', 'LEGALIZACJA'].includes(s.typ_zdarzenia)) return;
+
+                    const d = new Date(s.data_serwisu);
+                    // Tutaj logika jest inna: szukamy zdarzeń, które są "planowane" w przyszłości, a nie wykonane w przeszłości.
+                    // Ale w Twoim modelu data_serwisu to data wykonania.
+                    // Załóżmy, że jeśli data jest w przyszłości lub "dziś", to jest to plan.
+
+                    if (d < today) {
+                         // Opcjonalnie: Możesz tu dodać logikę "Przeterminowany przegląd" jeśli w systemie nie ma nowszego wpisu.
+                         // Na razie pominiemy to, żeby nie spamować starymi serwisami.
+                    } else if (d <= warningDate) {
+                        const diff = Math.ceil((d - today) / (1000 * 60 * 60 * 24));
+                        const label = s.typ_zdarzenia === 'BADANIE_TECH' ? 'Badanie Tech.' : 'Przegląd';
+                        alerts.push({ type: 'WARNING', msg: `Zbliża się ${label} (za ${diff} dni)`, date: s.data_serwisu, reg: s.pojazd_nr_rej, id: s.id, view: 'inspection' });
+                    }
+                });
+
+            } catch (e) { console.error("Błąd powiadomień:", e); }
+
+            // Sortowanie: Najpierw przeterminowane (Critical), potem wg daty
+            alerts.sort((a, b) => {
+                if (a.type === 'CRITICAL' && b.type !== 'CRITICAL') return -1;
+                if (a.type !== 'CRITICAL' && b.type === 'CRITICAL') return 1;
+                return new Date(a.date) - new Date(b.date);
+            });
+
+            return alerts;
+        }
+
+        // Funkcja aktualizująca "Czerwoną kropkę" (uruchamiana przy starcie)
+        async function updateNotificationBadge() {
+            const alerts = await getAlertsData();
+            const badge = document.getElementById('notif-badge-count');
+            if (alerts.length > 0) {
+                badge.style.display = 'inline-block';
+                badge.textContent = alerts.length;
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        // GŁÓWNA FUNKCJA WIDOKU
+        async function renderNotifications() {
+            currentView = 'notifications';
+            viewTitle.textContent = 'Centrum Powiadomień';
+            document.getElementById('add-btn').style.display = 'none'; // Ukryj przycisk dodawania
+
+            const contentDiv = document.getElementById('main-content');
+            contentDiv.innerHTML = '<div style="text-align:center; padding:20px;">Sprawdzanie terminów...</div>';
+
+            const alerts = await getAlertsData();
+            updateNotificationBadge(); // Przy okazji odśwież licznik
+
+            if (alerts.length === 0) {
+                contentDiv.innerHTML = `
+                    <div style="text-align:center; padding:50px; color:#28a745;">
+                        <i class="fas fa-check-circle" style="font-size:3em; margin-bottom:15px;"></i>
+                        <h3>Wszystko w porządku!</h3>
+                        <p>Brak zbliżających się terminów polis czy przeglądów.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '<div style="max-width: 800px; margin: 0 auto;">';
+
+            alerts.forEach(a => {
+                const icon = a.type === 'CRITICAL' ? '<i class="fas fa-exclamation-circle" style="color:#dc3545; font-size:1.5em;"></i>' : '<i class="fas fa-clock" style="color:#ffc107; font-size:1.5em;"></i>';
+                const btnAction = `<button onclick="openModal('${a.view}', ${a.id})" style="margin-left:auto; padding:5px 10px; cursor:pointer;">Szczegóły</button>`;
+
+                html += `
+                    <div class="alert-card ${a.type === 'CRITICAL' ? 'alert-critical' : 'alert-warning'}">
+                        <div style="display:flex; align-items:center; gap:15px;">
+                            ${icon}
+                            <div>
+                                <div style="font-weight:bold; font-size:1.1em;">${a.reg}</div>
+                                <div>${a.msg}</div>
+                                <div style="font-size:0.85em; color:#666;">Termin: ${a.date}</div>
+                            </div>
+                        </div>
+                        ${btnAction}
+                    </div>
+                `;
+            });
+            html += '</div>';
+            contentDiv.innerHTML = html;
+        }
+
         function checkAuthentication() {
             const accessToken = localStorage.getItem('access_token');
             const userRole = localStorage.getItem('user_role');
@@ -3105,6 +3289,9 @@
                 loginContainer.style.display = 'none';
                 mainApp.style.display = 'flex';
                 updateHeaderUser();
+
+                updateNotificationBadge(); // <--- DODAJ TO TUTAJ
+
                 loadView('vehicles');
             } else {
                 loginContainer.style.display = 'flex';
