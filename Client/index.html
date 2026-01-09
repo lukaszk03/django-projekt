@@ -528,7 +528,7 @@
                 <i class="fas fa-car-side"></i> <span>Pojazdy</span>
             </div>
             <div class="menu-item" data-view="drivers">
-                <i class="fas fa-users"></i> <span>Użytkownicy</span>
+                <i class="fas fa-users"></i> <span>Klienci</span>
             </div>
             <div class="menu-item" data-view="handover">
                 <i class="fas fa-key"></i> <span>Przekazania</span>
@@ -1465,7 +1465,7 @@
                 } catch (e) { console.error(e); }
 
                 // 2. POBIERANIE LISTY KIEROWCÓW
-                let driverOptions = '<option value="">-- Wybierz Kierowcę z Systemu --</option>';
+                let driverOptions = '<option value="">-- Wybierz Użytkownika z Systemu --</option>';
                 try {
                     const response = await fetch(API_BASE + 'drivers/', { headers: getAuthHeaders() });
                     if (response.ok) {
@@ -1509,7 +1509,7 @@
                     </div>
 
                     <div style="background: #d4edda; padding: 10px; border-radius: 5px; margin-bottom: 10px; border: 1px solid #c3e6cb;">
-                        <small style="color:#155724; font-weight:bold;">WERYFIKACJA ADMINISTRATORA:</small>
+                        <small style="color:#155724; font-weight:bold;">WERYFIKACJA DYSPOZYTORA:</small>
 
                         <label style="color: #155724;">Wybierz Użytkownika (Wymagane do Przekazania):</label>
                         <select id="r_driver_id" style="border: 1px solid #28a745; background: white;">${driverOptions}</select>
@@ -2470,7 +2470,7 @@
             if (!mainContent) return;
 
             currentView = 'drivers';
-            viewTitle.textContent = 'Użytkownicy (Kierowcy)';
+            viewTitle.textContent = 'Klienci';
             const gridLayout = "40px 150px 1fr 100px 110px 50px 110px 110px 100px";
 
             mainContent.innerHTML = `
