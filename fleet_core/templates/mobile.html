@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FLEETSYS MOBILE</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; margin: 0; height: 100vh; display: flex; flex-direction: column; }
+
+        /* Ekrany */
+        .screen { display: none; flex-grow: 1; padding: 20px; flex-direction: column; overflow-y: auto; }
+        .screen.active { display: flex; }
+
+        /* Nagłówki */
+        .app-header { background: #2c3e50; color: white; padding: 20px; text-align: center; font-size: 1.2em; font-weight: bold; border-bottom-left-radius: 20px; border-bottom-right-radius: 20px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+
+        /* Karty i Inputy */
+        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 15px; }
+        input, select, textarea { width: 100%; padding: 15px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; box-sizing: border-box; background: #fafafa; }
+
+        /* Przyciski */
+        .btn { width: 100%; padding: 18px; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 10px; transition: 0.2s; }
+        .btn:active { transform: scale(0.97); }
+        .btn-primary { background-color: #3498db; color: white; }
+        .btn-damage { background-color: #e74c3c; color: white; }
+        .btn-return { background-color: #2ecc71; color: white; }
+        .btn-secondary { background-color: #95a5a6; color: white; }
+
+        /* Galeria zdjęć */
+        .photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+        .photo-item { position: relative; aspect-ratio: 1; background: #ddd; border-radius: 8px; overflow: hidden; }
+        .photo-item img { width: 100%; height: 100%; object-fit: cover; }
+        .photo-remove { position: absolute; top: 2px; right: 2px; background: red; color: white; width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px; font-size: 12px; cursor: pointer; }
+
+        .add-photo-btn { aspect-ratio: 1; border: 2px dashed #bdc3c7; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #bdc3c7; font-size: 24px; cursor: pointer; }
+        .add-photo-btn:active { background: #ecf0f1; }
+
+        #camera-input { display: none; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="screen-login" class="screen active" style="justify-content: center;">
+        <div style="text-align: center; margin-bottom: 40px; color: #2c3e50;">
+            <i class="fas fa-shipping-fast" style="font-size: 3em;"></i>
+            <h2>FLEETSYS MOBILE</h2>
+        </div>
+        <input type="text" id="login-user" placeholder="Login">
+        <input type="password" id="login-pass" placeholder="Hasło">
+        <button class="btn btn-primary" onclick="handleLogin()">Zaloguj</button>
+        <p id="login-error" style="color: red; text-align: center;"></p>
+    </div>
+
+    <div id="screen-list" class="screen">
+        <div class="app-header">Moje Pojazdy</div>
+        <div id="cars-container">Ładowanie...</div>
+        <button class="btn btn-secondary" onclick="handleLogout()" style="margin-top: auto;">Wyloguj</button>
+    </div>
+
+    <div id="screen-action" class="screen">
+        <div class="app-header" id="action-header-title">...</div>
+
+        <div class="card" style="text-align: center;">
+            <h3 style="margin-top:0;">Co chcesz zrobić?</h3>
+            <p style="color:#7f8c8d;">Wybierz rodzaj zgłoszenia dla tego pojazdu.</p>
+        </div>
+
+        <button class="btn btn-damage" onclick="startFlow('DAMAGE')">
+            <i class="fas fa-car-crash"></i> Zgłoś Szkodę
+        </button>
+
+        <button class="btn btn-return" onclick="startFlow('RETURN')">
+            <i class="fas fa-key"></i> Oddaję Pojazd
+        </button>
+
+        <button class="btn btn-secondary" onclick="showScreen('screen-list')" style="margin-top: auto;">Wróć</button>
+    </div>
+
+    <div id="screen-form" class="screen">
+        <div class="app-header" id="form-title">Nowe Zgłoszenie</div>
+
+        <div class="card">
+            <div id="fields-damage" class="hidden">
+                <label>Opis uszkodzenia:</label>
+                <textarea id="dmg-desc" rows="3" placeholder="Np. Wgniecenie na parkingu..."></textarea>
+            </div>
+
+            <div id="fields-return" class="hidden">
+
+                <div style="background-color: #fff3cd; border: 1px solid #ffeeba; color: #856404; padding: 15px; border-radius: 8px; margin-bottom: 15px; font-size: 0.9em;">
+                    <strong style="display:block; margin-bottom:5px;"><i class="fas fa-camera"></i> INSTRUKCJA ZWROTU:</strong>
+                    1. Wykonaj 4 zdjęcia pojazdu (Przód, Tył, Lewy Bok, Prawy Bok).<br>
+                    2. Wykonaj zdjęcie licznika (przebieg/paliwo).<br>
+                    3. Zdjęcia muszą być ostre i wyraźne.
+                </div>
+
+                <label>Aktualny przebieg (km):</label>
+                <input type="number" id="ret-km" placeholder="0">
+                <label>Stan paliwa:</label>
+                <select id="ret-fuel">
+                    <option value="100">Pełny (100%)</option>
+                    <option value="75">3/4</option>
+                    <option value="50">1/2</option>
+                    <option value="25">1/4</option>
+                    <option value="0">Rezerwa</option>
+                </select>
+                <label>Uwagi do zwrotu:</label>
+                <textarea id="ret-desc" rows="2" placeholder="Np. Auto czyste, brak nowych uszkodzeń..."></textarea>
+            </div>
+
+            <label style="font-weight:bold;">Zdjęcia (Dokumentacja):</label>
+            <div class="photo-grid" id="photo-grid">
+                <div class="add-photo-btn" onclick="triggerCamera()">+</div>
+            </div>
+
+            <input type="file" id="camera-input" accept="image/*" capture="environment" onchange="addPhoto(this)">
+        </div>
+
+        <button class="btn btn-primary" onclick="submitData()" id="submit-btn">Wyślij Zgłoszenie</button>
+        <button class="btn btn-secondary" onclick="showScreen('screen-action')">Anuluj</button>
+        <p id="status-msg" style="text-align: center; font-weight: bold;"></p>
+    </div>
+
+    <script>
+        // Automatyczne wykrywanie adresu API
+        const API_BASE = window.location.origin + '/api/';
+        let token = localStorage.getItem('mobile_token');
+        let selectedCar = null;
+        let currentMode = null; // 'DAMAGE' lub 'RETURN'
+        let photos = []; // Tablica plików
+
+        // --- NAWIGACJA ---
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        // --- 1. LOGOWANIE ---
+        if (token) loadMyCars();
+
+        async function handleLogin() {
+            const u = document.getElementById('login-user').value;
+            const p = document.getElementById('login-pass').value;
+            try {
+                const res = await fetch(API_BASE + 'login/', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ username: u, password: p })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    token = data.access;
+                    localStorage.setItem('mobile_token', token);
+                    loadMyCars();
+                } else {
+                    document.getElementById('login-error').innerText = "Błąd logowania";
+                }
+            } catch (e) { alert("Błąd sieci"); }
+        }
+
+        function handleLogout() {
+            localStorage.removeItem('mobile_token');
+            location.reload(); //  <--- Wyłączamy to na chwilę, żeby widzieć błędy
+            showScreen('screen-login'); // Zamiast reloadu, po prostu pokaż ekran logowania
+            console.log("Wylogowano z powodu błędu lub żądania.");
+        }
+
+        // --- 2. LISTA POJAZDÓW ---
+        async function loadMyCars() {
+            showScreen('screen-list');
+            const container = document.getElementById('cars-container');
+            container.innerHTML = 'Pobieranie...';
+
+            try {
+                // Używamy nowej akcji my_list
+                const res = await fetch(API_BASE + 'vehicles/my_list/', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+
+                if (res.status === 401) { handleLogout(); return; }
+                const cars = await res.json();
+
+                container.innerHTML = '';
+                if (cars.length === 0) {
+                    container.innerHTML = '<div style="text-align:center; padding:20px;">Brak przypisanych pojazdów.</div>';
+                    return;
+                }
+
+                cars.forEach(c => {
+                    const div = document.createElement('div');
+                    div.className = 'card';
+                    div.style.display = 'flex';
+                    div.style.justifyContent = 'space-between';
+                    div.style.alignItems = 'center';
+                    div.style.cursor = 'pointer';
+                    div.innerHTML = `
+                        <div>
+                            <div style="font-weight:bold; font-size:1.1em;">${c.registration_number}</div>
+                            <div style="color:#7f8c8d;">${c.marka} ${c.model}</div>
+                        </div>
+                        <i class="fas fa-chevron-right" style="color:#ccc;"></i>
+                    `;
+                    div.onclick = () => selectCar(c);
+                    container.appendChild(div);
+                });
+
+            } catch (e) { container.innerHTML = 'Błąd pobierania listy.'; }
+        }
+
+        function selectCar(car) {
+            selectedCar = car;
+            document.getElementById('action-header-title').innerText = car.registration_number;
+            showScreen('screen-action');
+        }
+
+        // --- 3. PRZYGOTOWANIE FORMULARZA ---
+        function startFlow(mode) {
+            currentMode = mode;
+            photos = []; // Reset zdjęć
+            renderPhotos();
+            document.getElementById('status-msg').innerText = '';
+
+            const title = document.getElementById('form-title');
+            const dmgFields = document.getElementById('fields-damage');
+            const retFields = document.getElementById('fields-return');
+
+            dmgFields.classList.add('hidden');
+            retFields.classList.add('hidden');
+
+            if (mode === 'DAMAGE') {
+                title.innerText = "Zgłaszanie Szkody";
+                title.style.background = "#e74c3c";
+                dmgFields.classList.remove('hidden');
+            } else {
+                title.innerText = "Oddanie Pojazdu";
+                title.style.background = "#2ecc71";
+                retFields.classList.remove('hidden');
+            }
+
+            showScreen('screen-form');
+        }
+
+        // --- 4. OBSŁUGA ZDJĘĆ ---
+        function triggerCamera() {
+            document.getElementById('camera-input').click();
+        }
+
+        function addPhoto(input) {
+            if (input.files && input.files[0]) {
+                photos.push(input.files[0]);
+                renderPhotos();
+            }
+            input.value = ''; // Reset inputa żeby można było dodać to samo zdjęcie 2 razy
+        }
+
+        function removePhoto(index) {
+            photos.splice(index, 1);
+            renderPhotos();
+        }
+
+        function renderPhotos() {
+            const grid = document.getElementById('photo-grid');
+            // Usuwamy wszystko oprócz przycisku dodawania (ostatni element)
+            const btn = grid.lastElementChild;
+            grid.innerHTML = '';
+
+            photos.forEach((file, idx) => {
+                const reader = new FileReader();
+                const div = document.createElement('div');
+                div.className = 'photo-item';
+
+                const removeBtn = document.createElement('div');
+                removeBtn.className = 'photo-remove';
+                removeBtn.innerText = 'X';
+                removeBtn.onclick = () => removePhoto(idx);
+
+                const img = document.createElement('img');
+
+                reader.onload = (e) => { img.src = e.target.result; };
+                reader.readAsDataURL(file);
+
+                div.appendChild(img);
+                div.appendChild(removeBtn);
+                grid.appendChild(div);
+            });
+
+            grid.appendChild(btn); // Przywracamy przycisk
+        }
+
+        // --- 5. WYSYŁANIE ---
+        async function submitData() {
+            const status = document.getElementById('status-msg');
+            status.innerText = "Wysyłanie danych... ⏳";
+            status.style.color = "orange";
+            document.getElementById('submit-btn').disabled = true;
+
+            try {
+                // KROK 1: Logika Biznesowa (Szkoda lub Log Zwrotu)
+                if (currentMode === 'DAMAGE') {
+                    // Tworzymy wpis w Szkodach
+                    const desc = document.getElementById('dmg-desc').value;
+                    const res = await fetch(API_BASE + 'damage_events/', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer ' + token,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            pojazd: selectedCar.id,
+                            data_zdarzenia: new Date().toISOString().split('T')[0],
+                            status_naprawy: 'ZGLOSZONA',
+                            opis: `[MOBILNE] ${desc}`,
+                            szacowany_koszt: 0
+                        })
+                    });
+                    if (!res.ok) throw new Error("Błąd tworzenia szkody");
+                }
+
+                // KROK 2: Wysyłanie zdjęć (dla obu trybów)
+                // Uploadujemy zdjęcia jako Documenty Pojazdu z odpowiednim tytułem
+                const uploadPromises = photos.map(file => {
+                    const formData = new FormData();
+                    formData.append('vehicle', selectedCar.id);
+
+                    let titlePrefix = currentMode === 'DAMAGE' ? 'SZKODA' : 'ZWROT';
+                    formData.append('title', `${titlePrefix} - ${new Date().toLocaleTimeString()}`);
+                    formData.append('file', file);
+
+                    // Dodajemy opis z formularza do opisu pliku
+                    let extraDesc = "";
+                    if (currentMode === 'RETURN') {
+                        const km = document.getElementById('ret-km').value;
+                        extraDesc = `Deklarowany przebieg: ${km} km. `;
+                        extraDesc += document.getElementById('ret-desc').value;
+                    } else {
+                        extraDesc = document.getElementById('dmg-desc').value;
+                    }
+                    formData.append('description', extraDesc);
+
+                    return fetch(API_BASE + 'vehicle_documents/', {
+                        method: 'POST',
+                        headers: { 'Authorization': 'Bearer ' + token },
+                        body: formData
+                    });
+                });
+
+                await Promise.all(uploadPromises);
+
+                status.innerText = "✅ Sukces! Dziękujemy.";
+                status.style.color = "green";
+
+                setTimeout(() => {
+                    document.getElementById('submit-btn').disabled = false;
+                    loadMyCars(); // Powrót do listy
+                }, 2000);
+
+            } catch (e) {
+                console.error(e);
+                status.innerText = "❌ Błąd: " + e.message;
+                status.style.color = "red";
+                document.getElementById('submit-btn').disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

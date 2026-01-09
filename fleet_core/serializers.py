@@ -97,12 +97,34 @@ class DriverDto(serializers.ModelSerializer):
 
 # 3. SZKODY
 class DamageEventDto(serializers.ModelSerializer):
-    pojazd_nr_rej = serializers.CharField(source='pojazd.registration_number', read_only=True)
+    # Pola informacyjne (Read Only) - potrzebne do wyświetlania w tabeli
+    pojazd_rej = serializers.CharField(source='pojazd.registration_number', read_only=True)
+    pojazd_marka = serializers.ReadOnlyField(source='pojazd.marka')
+    pojazd_model = serializers.ReadOnlyField(source='pojazd.model')
+    status_display = serializers.CharField(source='get_status_naprawy_display', read_only=True)
+
+    # KLUCZOWE: Pole sprawdzające czy są zdjęcia (dla ikonki aparatu)
+    has_photos = serializers.SerializerMethodField()
 
     class Meta:
         model = DamageEvent
-        fields = ['id', 'pojazd', 'pojazd_nr_rej', 'opis', 'data_zdarzenia', 'szacowany_koszt',
-                  'zgloszony_do_ubezpieczyciela', 'status_naprawy']
+        fields = [
+            'id', 'pojazd',
+            'pojazd_rej', 'pojazd_marka', 'pojazd_model', # Info o aucie
+            'opis', 'data_zdarzenia',
+            'szacowany_koszt', 'zgloszony_do_ubezpieczyciela',
+            'status_naprawy', 'status_display', # Info o statusie
+            'has_photos' # Logika zdjęć
+        ]
+
+    def get_has_photos(self, obj):
+        # Sprawdzamy, czy w dokumentach pojazdu są pliki ze słowem "SZKODA"
+        # i czy data wgrania zgadza się z datą zdarzenia.
+        return VehicleDocument.objects.filter(
+            vehicle=obj.pojazd,
+            title__icontains='SZKODA',
+            uploaded_at__date=obj.data_zdarzenia
+        ).exists()
 
 # 4. POLISY
 class InsurancePolicyDto(serializers.ModelSerializer):
@@ -116,6 +138,7 @@ class InsurancePolicyDto(serializers.ModelSerializer):
 
 # 5. PRZEKAZANIA
 class VehicleHandoverDto(serializers.ModelSerializer):
+    # Pola tylko do odczytu (dla wygody frontend'u)
     imie = serializers.ReadOnlyField(source='kierowca.user.first_name')
     nazwisko = serializers.ReadOnlyField(source='kierowca.user.last_name')
     firma = serializers.ReadOnlyField(source='kierowca.company.nazwa')
@@ -123,10 +146,10 @@ class VehicleHandoverDto(serializers.ModelSerializer):
     model = serializers.ReadOnlyField(source='pojazd.model')
     rejestracja = serializers.ReadOnlyField(source='pojazd.registration_number')
 
-    # ID Rezerwacji (zostawiamy w API, ale ukryjemy we frontendzie)
+    # ID Rezerwacji
     reservation_id = serializers.ReadOnlyField(source='reservation.id')
 
-    # Pola do usuwania plików
+    # Pola techniczne do usuwania plików (write_only - nie zapisują się w bazie)
     remove_scan_agreement = serializers.BooleanField(write_only=True, required=False)
     remove_scan_handover_protocol = serializers.BooleanField(write_only=True, required=False)
     remove_scan_return_protocol = serializers.BooleanField(write_only=True, required=False)
@@ -141,12 +164,12 @@ class VehicleHandoverDto(serializers.ModelSerializer):
             'marka', 'model', 'rejestracja',
             'data_wydania', 'data_zwrotu', 'uwagi',
 
-            # NOWE POLA:
+            # Pola liczbowe / finansowe
             'przebieg_start', 'przebieg_stop', 'dystans',
             'paliwo_start', 'paliwo_stop',
             'stawka_za_km', 'koszt_brakujacego_paliwa', 'calkowity_koszt',
 
-            # Pliki i usuwanie (zachowaj je)
+            # Pliki i usuwanie
             'scan_agreement', 'scan_handover_protocol', 'scan_return_protocol',
             'remove_scan_agreement', 'remove_scan_handover_protocol', 'remove_scan_return_protocol'
         ]
@@ -156,8 +179,29 @@ class VehicleHandoverDto(serializers.ModelSerializer):
             return obj.przebieg_stop - obj.przebieg_start
         return 0
 
+    # --- METODA CREATE (NAPRAWIA BŁĄD SERVER ERROR 500) ---
+    def create(self, validated_data):
+        # 1. Usuwamy pola "remove_...", bo baza danych ich nie zna
+        validated_data.pop('remove_scan_agreement', None)
+        validated_data.pop('remove_scan_handover_protocol', None)
+        validated_data.pop('remove_scan_return_protocol', None)
+
+        # 2. Tworzymy wpis w bazie
+        handover = VehicleHandover.objects.create(**validated_data)
+
+        # 3. LOGIKA BIZNESOWA: Przypisz auto do kierowcy
+        # Jeśli wydajemy auto (brak daty zwrotu), to przypisujemy je temu kierowcy
+        if not handover.data_zwrotu:
+            vehicle = handover.pojazd
+            vehicle.assigned_user = handover.kierowca.user
+            vehicle.status = 'SPRAWNY'  # Zakładamy, że wydajemy sprawne
+            vehicle.save()
+
+        return handover
+
+    # --- METODA UPDATE (DODANO AKTUALIZACJĘ POJAZDU PRZY ZWROCIE) ---
     def update(self, instance, validated_data):
-        # Logika usuwania plików
+        # 1. Logika usuwania plików (Twoja oryginalna)
         files_to_check = [
             ('scan_agreement', 'remove_scan_agreement'),
             ('scan_handover_protocol', 'remove_scan_handover_protocol'),
@@ -170,7 +214,25 @@ class VehicleHandoverDto(serializers.ModelSerializer):
                     f.delete(save=False)
                     setattr(instance, field, None)
 
-        return super().update(instance, validated_data)
+        # 2. Standardowa aktualizacja danych w bazie
+        instance = super().update(instance, validated_data)
+
+        # 3. LOGIKA BIZNESOWA: Zwrot pojazdu
+        # Jeśli wpisano datę zwrotu, zwalniamy pojazd i aktualizujemy przebieg
+        if instance.data_zwrotu:
+            vehicle = instance.pojazd
+
+            # Odpinamy kierowcę (tylko jeśli to ten sam, żeby nie nadpisać, jeśli ktoś inny już je wziął)
+            if vehicle.assigned_user == instance.kierowca.user:
+                vehicle.assigned_user = None
+
+            # Aktualizujemy przebieg w pojeździe na ten ze zwrotu
+            if instance.przebieg_stop:
+                vehicle.przebieg = instance.przebieg_stop
+
+            vehicle.save()
+
+        return instance
 
 # 6. ZDARZENIA SERWISOWE (Inspekcje, Przeglądy, Naprawy) - NOWE
 class ServiceEventDto(serializers.ModelSerializer):

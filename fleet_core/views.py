@@ -7,13 +7,23 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth import authenticate  # Do weryfikacji hasła
 from rest_framework_simplejwt.tokens import RefreshToken  # Do generowania tokenów
+from django.shortcuts import render
+from django.db.models import Q  # <--- WAŻNE: Potrzebne do filtrowania w my_list
 
-# Usunięto błędny import 'User' - używamy tylko CustomUser z .models
-# DODANO: ServiceEventDto do listy importów
-from .serializers import VehicleDto, DriverDto, DamageEventDto, InsurancePolicyDto, VehicleHandoverDto, ServiceEventDto, ReservationDto, VehicleDocumentDto, GlobalSettingsDto
+# Importy Serializerów
+from .serializers import (
+    VehicleDto, DriverDto, DamageEventDto, InsurancePolicyDto,
+    VehicleHandoverDto, ServiceEventDto, ReservationDto,
+    VehicleDocumentDto, GlobalSettingsDto
+)
 
-# DODANO: ServiceEvent do listy importów
-from .models import Vehicle, Driver, DamageEvent, InsurancePolicy, CustomUser, VehicleHandover, ServiceEvent, Reservation, VehicleDocument, GlobalSettings, FleetCompany
+# Importy Modeli
+from .models import (
+    Vehicle, Driver, DamageEvent, InsurancePolicy, CustomUser,
+    VehicleHandover, ServiceEvent, Reservation, VehicleDocument,
+    GlobalSettings, FleetCompany
+)
+
 
 # ----------------------------------------------------
 # WIDOKI DLA ZARZĄDZANIA DANYMI FLOTY (Fleet Data ViewSets)
@@ -24,12 +34,37 @@ class VehicleViewSet(viewsets.ModelViewSet):
     queryset = Vehicle.objects.select_related('company').all()
     serializer_class = VehicleDto
 
+    # --- NOWA METODA DLA APLIKACJI MOBILNEJ (MOJE POJAZDY) ---
+    @action(detail=False, methods=['get'])
+    def my_list(self, request):
+        """
+        Zwraca tylko pojazdy przypisane do zalogowanego użytkownika (stałe lub przez wydanie).
+        """
+        user = request.user
+        if not user.is_authenticated:
+            return Response({"detail": "Wymagane logowanie"}, status=401)
+
+        # 1. Pobieramy ID aut z aktywnych przekazań tego kierowcy (niezwrócone)
+        active_handovers_ids = VehicleHandover.objects.filter(
+            kierowca__user=user,
+            data_zwrotu__isnull=True
+        ).values_list('pojazd_id', flat=True)
+
+        # 2. Filtrujemy: Auto przypisane na stałe LUB auto z aktywnego wydania
+        vehicles = Vehicle.objects.filter(
+            Q(assigned_user=user) | Q(id__in=active_handovers_ids)
+        ).distinct()
+
+        serializer = self.get_serializer(vehicles, many=True)
+        return Response(serializer.data)
+
+    # --- HISTORIA POJAZDU ---
     @action(detail=True, methods=['get'])
     def history(self, request, pk=None):
         vehicle = self.get_object()
         events = []
 
-        # 1. Przekazania (HANDOVER) - Ciemny Niebieski
+        # 1. Przekazania (HANDOVER)
         for h in vehicle.handovers.all():
             kierowca = f"{h.kierowca.user.first_name} {h.kierowca.user.last_name}"
             firma = h.kierowca.company.nazwa if h.kierowca.company else 'Brak firmy'
@@ -47,10 +82,10 @@ class VehicleViewSet(viewsets.ModelViewSet):
                 'title': 'Wydanie Pojazdu',
                 'description': desc_start,
                 'icon': 'fa-key',
-                'color': '#0d47a1'  # <--- CIEMNY NIEBIESKI (Wydanie)
+                'color': '#0d47a1'
             })
 
-            # Opis Zwrotu (Zostawiamy turkusowy/morski dla odróżnienia, lub też niebieski)
+            # Opis Zwrotu
             if h.data_zwrotu:
                 desc_stop = f"Zwrot od: {kierowca}."
                 desc_stop += f"\nStan licznika: {h.przebieg_stop} km."
@@ -65,10 +100,10 @@ class VehicleViewSet(viewsets.ModelViewSet):
                     'title': 'Zwrot Pojazdu',
                     'description': desc_stop,
                     'icon': 'fa-check-circle',
-                    'color': '#17a2b8'  # Turkusowy (pozostawiamy dla czytelności zwrotu)
+                    'color': '#17a2b8'
                 })
 
-        # 2. Szkody - Ciemniejszy Czerwony
+        # 2. Szkody
         for d in vehicle.damage_history.all():
             szkoda_desc = d.opis
             if d.szacowany_koszt and float(d.szacowany_koszt) > 0:
@@ -80,27 +115,26 @@ class VehicleViewSet(viewsets.ModelViewSet):
                 'title': f'Szkoda ({d.get_status_naprawy_display()})',
                 'description': szkoda_desc,
                 'icon': 'fa-car-burst',
-                'color': '#8B0000'  # <--- CIEMNY CZERWONY (DarkRed)
+                'color': '#8B0000'
             })
 
-        # 3. Serwisy / Przeglądy / Naprawy (Kolory jak w Terminarzu)
+        # 3. Serwisy
         for s in vehicle.service_history.all():
             service_desc = s.opis
             if s.koszt and float(s.koszt) > 0:
                 service_desc += f"\nKoszt: {s.koszt} PLN"
 
-            # Logika kolorów zgodna z Terminarzem
             if s.typ_zdarzenia == 'PRZEGLAD':
-                color = '#28a745'  # ZIELONY (Przegląd)
+                color = '#28a745'
                 icon = 'fa-check-double'
             elif s.typ_zdarzenia == 'NAPRAWA':
-                color = '#dc3545'  # CZERWONY (Naprawa - jaśniejszy niż szkoda)
+                color = '#dc3545'
                 icon = 'fa-tools'
             elif s.typ_zdarzenia == 'BADANIE_TECH':
-                color = '#ffc107'  # ŻÓŁTY (Badanie Tech)
+                color = '#ffc107'
                 icon = 'fa-clipboard-check'
             else:
-                color = '#6c757d'  # Szary (Inne)
+                color = '#6c757d'
                 icon = 'fa-wrench'
 
             events.append({
@@ -112,23 +146,21 @@ class VehicleViewSet(viewsets.ModelViewSet):
                 'color': color
             })
 
-        # 4. Polisy - Niebieski (jak w Terminarzu)
+        # 4. Polisy
         for p in vehicle.policies.all():
             policy_desc = f"Ubezpieczyciel: {p.ubezpieczyciel}\nNr: {p.numer_polisy}"
             if p.koszt and float(p.koszt) > 0:
                 policy_desc += f"\nKoszt: {p.koszt} PLN"
 
-            # OC
             events.append({
                 'date': p.data_waznosci_oc,
                 'type': 'POLICY',
                 'title': f"Koniec Polisy OC",
                 'description': policy_desc,
                 'icon': 'fa-file-contract',
-                'color': '#007bff'  # <--- NIEBIESKI (Polisa, jak w kalendarzu)
+                'color': '#007bff'
             })
 
-            # AC (jeśli jest)
             if p.data_waznosci_ac:
                 events.append({
                     'date': p.data_waznosci_ac,
@@ -136,29 +168,22 @@ class VehicleViewSet(viewsets.ModelViewSet):
                     'title': f"Koniec Polisy AC",
                     'description': policy_desc,
                     'icon': 'fa-shield-alt',
-                    'color': '#007bff'  # <--- NIEBIESKI
+                    'color': '#007bff'
                 })
 
-        # Sortowanie po dacie (od najnowszych)
         events.sort(key=lambda x: str(x['date']), reverse=True)
-
         return Response(events)
 
+    # --- DOSTĘPNOŚĆ (TERMINARZ) ---
     @action(detail=False, methods=['get'])
     def availability(self, request):
-        """
-        Zwraca listę pojazdów z flagą 'is_available' dla zadanego zakresu dat.
-        Użycie: /api/vehicles/availability/?start=YYYY-MM-DD&end=YYYY-MM-DD&exclude_id=...
-        """
         start_date = request.query_params.get('start')
         end_date = request.query_params.get('end')
-        # Opcjonalnie ID rezerwacji do wykluczenia (przy edycji, żeby nie blokowała samej siebie)
         exclude_id = request.query_params.get('exclude_id')
 
         vehicles = self.get_queryset()
         data = []
 
-        # Jeśli brak dat, zwracamy po prostu listę wszystkich jako dostępnych (lub wg statusu)
         if not start_date or not end_date:
             for v in vehicles:
                 data.append({
@@ -166,15 +191,13 @@ class VehicleViewSet(viewsets.ModelViewSet):
                     'registration_number': v.registration_number,
                     'marka': v.marka,
                     'model': v.model,
-                    'status': v.status,  # SPRAWNY / NIESPRAWNY
-                    'is_available': True,  # Domyślnie dostępny
+                    'status': v.status,
+                    'is_available': True,
                     'busy_info': ''
                 })
             return Response(data)
 
-        # Sprawdzanie konfliktów
         for v in vehicles:
-            # Szukamy rezerwacji, które nakładają się na termin
             conflicts = Reservation.objects.filter(
                 assigned_vehicle=v,
                 date_from__lte=end_date,
@@ -187,7 +210,6 @@ class VehicleViewSet(viewsets.ModelViewSet):
             is_busy = conflicts.exists()
             busy_info = ""
             if is_busy:
-                # Pobierz daty pierwszej kolizji dla info
                 c = conflicts.first()
                 busy_info = f"Zajęty: {c.date_from} - {c.date_to}"
 
@@ -203,27 +225,39 @@ class VehicleViewSet(viewsets.ModelViewSet):
 
         return Response(data)
 
+
 # 2. WIDOK DLA UŻYTKOWNIKÓW (Kierowców)
 class DriverViewSet(viewsets.ModelViewSet):
-    # Optymalizacja! Ładujemy powiązany obiekt User
     queryset = Driver.objects.select_related('user').all()
     serializer_class = DriverDto
 
-# 3. WIDOK DLA ZDARZEŃ SERWISOWYCH (Inspekcje, Naprawy, Przeglądy) - PRZYWRÓCONE
+
+# 3. WIDOK DLA ZDARZEŃ SERWISOWYCH (POPRAWIONE FILTROWANIE)
 class ServiceEventViewSet(viewsets.ModelViewSet):
-    # select_related('pojazd') jest konieczne, aby wyciągnąć VIN i Nr Rej. bez dodatkowych zapytań
-    queryset = ServiceEvent.objects.select_related('pojazd').all()
+    queryset = ServiceEvent.objects.select_related('pojazd').all().order_by('-data_serwisu')
     serializer_class = ServiceEventDto
 
-# 4. WIDOK DLA ZDARZEŃ SZKODOWYCH
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        vehicle_id = self.request.query_params.get('vehicle')
+        if vehicle_id:
+            queryset = queryset.filter(pojazd_id=vehicle_id)
+        return queryset
+
+
+# 4. WIDOK DLA ZDARZEŃ SZKODOWYCH (POPRAWIONE FILTROWANIE)
 class DamageEventViewSet(viewsets.ModelViewSet):
-    queryset = DamageEvent.objects.select_related('pojazd').all()
+    queryset = DamageEvent.objects.select_related('pojazd').all().order_by('-data_zdarzenia')
     serializer_class = DamageEventDto
 
-    # Funkcja pomocnicza: Sprawdza szkody i aktualizuje status auta
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        vehicle_id = self.request.query_params.get('vehicle')
+        if vehicle_id:
+            queryset = queryset.filter(pojazd_id=vehicle_id)
+        return queryset
+
     def _update_vehicle_status(self, vehicle):
-        # Sprawdzamy, czy ten pojazd ma jakiekolwiek OTWARTE szkody
-        # (czyli status 'ZGLOSZONA' lub 'W_NAPRAWIE')
         ma_aktywne_szkody = DamageEvent.objects.filter(
             pojazd=vehicle,
             status_naprawy__in=['ZGLOSZONA', 'W_NAPRAWIE']
@@ -232,60 +266,130 @@ class DamageEventViewSet(viewsets.ModelViewSet):
         if ma_aktywne_szkody:
             vehicle.status = 'NIESPRAWNY'
         else:
-            # Jeśli nie ma aktywnych szkód (wszystkie zamknięte lub brak szkód)
             vehicle.status = 'SPRAWNY'
-
         vehicle.save()
 
-    # 1. Przy TWORZENIU nowej szkody
     def perform_create(self, serializer):
         damage = serializer.save()
         self._update_vehicle_status(damage.pojazd)
 
-    # 2. Przy EDYCJI szkody (np. zmiana statusu na ZAMKNIETA)
     def perform_update(self, serializer):
         damage = serializer.save()
         self._update_vehicle_status(damage.pojazd)
 
-    # 3. Przy USUWANIU szkody (np. usunięcie błędnego wpisu)
     def perform_destroy(self, instance):
         vehicle = instance.pojazd
-        instance.delete()  # Najpierw usuwamy szkodę
-        self._update_vehicle_status(vehicle)  # Potem przeliczamy status auta
+        instance.delete()
+        self._update_vehicle_status(vehicle)
 
-# 5. NOWY WIDOK DLA POLIS
+
+# 5. WIDOK DLA POLIS (POPRAWIONE FILTROWANIE)
 class InsurancePolicyViewSet(viewsets.ModelViewSet):
     queryset = InsurancePolicy.objects.select_related('pojazd').all()
     serializer_class = InsurancePolicyDto
 
-# 6. NOWY WIDOK DLA PRZEKAZAŃ
-class VehicleHandoverViewSet(viewsets.ModelViewSet):
-    queryset = VehicleHandover.objects.select_related('kierowca__user', 'kierowca__company', 'pojazd').all()
-    serializer_class = VehicleHandoverDto
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        vehicle_id = self.request.query_params.get('vehicle')
+        if vehicle_id:
+            queryset = queryset.filter(pojazd_id=vehicle_id)
+        return queryset
 
-    # ZMIANA NA CZAS TESTÓW: AllowAny
-    # To pozwoli nam sprawdzić czy kod działa, ignorując błędy tokena
+
+# 6. WIDOK DLA PRZEKAZAŃ (POPRAWIONE FILTROWANIE)
+class VehicleHandoverViewSet(viewsets.ModelViewSet):
+    queryset = VehicleHandover.objects.select_related('kierowca__user', 'kierowca__company', 'pojazd').all().order_by('-data_wydania')
+    serializer_class = VehicleHandoverDto
     permission_classes = [permissions.AllowAny]
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        vehicle_id = self.request.query_params.get('vehicle')
+        if vehicle_id:
+            queryset = queryset.filter(pojazd_id=vehicle_id)
+        return queryset
+
+
+# 7. WIDOK DLA REZERWACJI
+class ReservationViewSet(viewsets.ModelViewSet):
+    queryset = Reservation.objects.all().order_by('-created_at')
+    serializer_class = ReservationDto
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        # Automatyczne tworzenie wydania przy zatwierdzeniu
+        if instance.status == 'ZATWIERDZONE' and instance.assigned_vehicle and instance.driver:
+            exists = VehicleHandover.objects.filter(
+                pojazd=instance.assigned_vehicle,
+                data_wydania=instance.date_from
+            ).exists()
+
+            if not exists:
+                VehicleHandover.objects.create(
+                    kierowca=instance.driver,
+                    pojazd=instance.assigned_vehicle,
+                    reservation=instance,
+                    data_wydania=instance.date_from,
+                    data_zwrotu=instance.date_to,
+                    uwagi=f"Automatycznie z rezerwacji (ID: {instance.id})."
+                )
+
+
+# 8. WIDOK DLA DOKUMENTÓW I USTAWIEŃ
+class VehicleDocumentViewSet(viewsets.ModelViewSet):
+    # Podstawowe zapytanie (wszystkie dokumenty, posortowane od najnowszych)
+    queryset = VehicleDocument.objects.select_related('vehicle').all().order_by('-uploaded_at')
+    serializer_class = VehicleDocumentDto
+
+    def get_queryset(self):
+        """
+        Nadpisujemy metodę pobierania danych, aby obsłużyć filtrowanie.
+        Dzięki temu zapytanie api/vehicle_documents/?vehicle=5 zwróci tylko pliki tego auta.
+        """
+        # Bierzemy podstawowy queryset zdefiniowany wyżej
+        queryset = super().get_queryset()
+
+        # Pobieramy parametr 'vehicle' z adresu URL (jeśli istnieje)
+        vehicle_id = self.request.query_params.get('vehicle')
+
+        # Jeśli parametr został podany, filtrujemy listę
+        if vehicle_id:
+            queryset = queryset.filter(vehicle_id=vehicle_id)
+
+        return queryset
+
+
+class GlobalSettingsViewSet(viewsets.ViewSet):
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        settings_obj, created = GlobalSettings.objects.get_or_create(id=1)
+        serializer = GlobalSettingsDto(settings_obj)
+        return Response(serializer.data)
+
+    def create(self, request):
+        settings_obj, created = GlobalSettings.objects.get_or_create(id=1)
+        serializer = GlobalSettingsDto(settings_obj, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
+
+
 # ----------------------------------------------------
-# WIDOK FUNKCYJNY DLA LOGOWANIA Z 2FA
+# WIDOKI FUNKCYJNE (LOGIN, REJESTRACJA, MOBILE)
 # ----------------------------------------------------
 
 @api_view(['POST'])
-@permission_classes([])  # Dostępne bez tokenu
+@permission_classes([])
 def login_view(request):
-    """
-    Obsługuje logowanie. Dla Adminów wymaga dodatkowego PIN-u (2FA).
-    """
     username = request.data.get('username')
     password = request.data.get('password')
     pin_2fa = request.data.get('pin_2fa')
 
-    # 1. Weryfikacja podstawowych danych logowania
     user = authenticate(username=username, password=password)
 
     if user is not None:
-        # 2. Weryfikacja Logiki 2FA dla Administratora
         if user.rola == 'ADMIN':
             if not pin_2fa or user.pin_2fa != pin_2fa:
                 return Response(
@@ -293,10 +397,7 @@ def login_view(request):
                     status=status.HTTP_401_UNAUTHORIZED
                 )
 
-        # 3. Generujemy tokeny
         refresh = RefreshToken.for_user(user)
-
-        # 4. Zwracamy tokeny i dane użytkownika
         return Response({
             'refresh': str(refresh),
             'access': str(refresh.access_token),
@@ -309,20 +410,14 @@ def login_view(request):
         status=status.HTTP_401_UNAUTHORIZED
     )
 
-# ==================
-# Rejestracja
-#==================
 
 @api_view(['POST'])
-@permission_classes([])  # Dostępne dla każdego
+@permission_classes([])
 def register_view(request):
     username = request.data.get('username')
     password = request.data.get('password')
     email = request.data.get('email')
-
-    # 1. POPRAWKA: Pobieramy nazwę firmy z żądania
     company_name = request.data.get('company_name', '').strip()
-
     rola = 'DRIVER'
     first_name = request.data.get('first_name', '')
     last_name = request.data.get('last_name', '')
@@ -330,7 +425,6 @@ def register_view(request):
     if not username or not password:
         return Response({'detail': 'Nazwa użytkownika i hasło są wymagane.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # 2. POPRAWKA: Sprawdzamy, czy podano firmę
     if not company_name:
         return Response({'detail': 'Podanie nazwy firmy jest wymagane.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -346,13 +440,11 @@ def register_view(request):
         last_name=last_name
     )
 
-    # 3. POPRAWKA: Poprawna składnia (zamknięcie nawiasu)
     company_obj, created = FleetCompany.objects.get_or_create(
         nazwa=company_name,
         defaults={'nip': ''}
     )
 
-    # 4. POPRAWKA: Tylko jedno tworzenie kierowcy
     Driver.objects.create(
         user=user,
         company=company_obj,
@@ -362,48 +454,8 @@ def register_view(request):
 
     return Response({'detail': 'Konto zostało utworzone. Możesz się zalogować.'}, status=status.HTTP_201_CREATED)
 
-# 7. NOWY WIDOK DLA REZERWACJI
-class ReservationViewSet(viewsets.ModelViewSet):
-    queryset = Reservation.objects.all().order_by('-created_at')
-    serializer_class = ReservationDto
 
-    def perform_update(self, serializer):
-        instance = serializer.save()
-
-        if instance.status == 'ZATWIERDZONE' and instance.assigned_vehicle and instance.driver:
-            exists = VehicleHandover.objects.filter(
-                pojazd=instance.assigned_vehicle,
-                data_wydania=instance.date_from
-            ).exists()
-
-            if not exists:
-                VehicleHandover.objects.create(
-                    kierowca=instance.driver,
-                    pojazd=instance.assigned_vehicle,
-                    reservation=instance,  # <--- TUTAJ PRZYPISUJEMY REZERWACJĘ
-                    data_wydania=instance.date_from,
-                    data_zwrotu=instance.date_to,
-                    uwagi=f"Automatycznie z rezerwacji (ID: {instance.id})."
-                )
-
-class VehicleDocumentViewSet(viewsets.ModelViewSet):
-    queryset = VehicleDocument.objects.select_related('vehicle').all().order_by('-uploaded_at')
-    serializer_class = VehicleDocumentDto
-
-class GlobalSettingsViewSet(viewsets.ViewSet):
-    # Ten widok działa specyficznie: zawsze zwraca ten sam, jedyny rekord
-    permission_classes = [permissions.AllowAny] # Lub IsAuthenticated
-
-    def list(self, request):
-        settings_obj, created = GlobalSettings.objects.get_or_create(id=1)
-        serializer = GlobalSettingsDto(settings_obj)
-        return Response(serializer.data)
-
-    def create(self, request):
-        # Używamy create jako "update", bo mamy tylko 1 rekord
-        settings_obj, created = GlobalSettings.objects.get_or_create(id=1)
-        serializer = GlobalSettingsDto(settings_obj, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=400)
+@api_view(['GET'])
+@permission_classes([])
+def mobile_app_view(request):
+    return render(request, 'mobile.html')

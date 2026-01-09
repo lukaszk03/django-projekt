@@ -3,7 +3,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-# UWAGA: Usunąłem ServiceEventViewSet z listy importów, bo już nie istnieje
 from .views import (
     VehicleViewSet,
     DriverViewSet,
@@ -15,12 +14,13 @@ from .views import (
     register_view,
     ServiceEventViewSet,
     VehicleDocumentViewSet,
-    GlobalSettingsViewSet
+    GlobalSettingsViewSet,
+    mobile_app_view  # <--- DODANO IMPORT WIDOKU MOBILNEGO
 )
 
 router = DefaultRouter()
 
-# Rejestracja widoków w routerze
+# Rejestracja widoków w routerze API
 router.register(r'vehicles', VehicleViewSet, basename='vehicle')
 router.register(r'drivers', DriverViewSet, basename='driver')
 router.register(r'service_events', ServiceEventViewSet, basename='service_event')
@@ -36,6 +36,9 @@ urlpatterns = [
     path('login/', login_view, name='login'),
     path('register/', register_view, name='register'),
 
-    # Ścieżki API generowane przez router
+    # NOWA ŚCIEŻKA DLA APLIKACJI MOBILNEJ:
+    path('mobile/', mobile_app_view, name='mobile-app'),
+
+    # Ścieżki API generowane przez router (musi być na końcu, żeby nie przesłaniało innych)
     path('', include(router.urls)),
 ]
