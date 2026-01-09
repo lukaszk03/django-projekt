@@ -1284,9 +1284,39 @@
                     <label>Badania lek:</label><input type="date" id="data_badan_val" value="${record?.data_waznosci_badan || ''}">
                 `;
             }
-            // 4. PRZEKAZANIA (ZAKTUALIZOWANE O PLIKI)
+            // 4. PRZEKAZANIA (ZAKTUALIZOWANE: DROPDOWNY + AUTO-PRZEBIEG)
             else if (viewName === 'handover') {
 
+                // 1. POBIERANIE LIST DO DROPDOWNÓW
+                let vehicles = [];
+                let drivers = [];
+
+                try {
+                    const [vRes, dRes] = await Promise.all([
+                        fetch(API_BASE + 'vehicles/', { headers: getAuthHeaders() }),
+                        fetch(API_BASE + 'drivers/', { headers: getAuthHeaders() })
+                    ]);
+                    if (vRes.ok) vehicles = await vRes.json();
+                    if (dRes.ok) drivers = await dRes.json();
+                } catch (e) { console.error("Błąd pobierania słowników:", e); }
+
+                // 2. GENEROWANIE OPCJI POJAZDÓW (Z DODANYM ATRYBUTEM data-przebieg)
+                const vehicleOptions = vehicles.map(v => {
+                    const isSelected = (record && record.pojazd === v.id) ? 'selected' : '';
+                    const label = `${v.marka} ${v.model} - ${v.registration_number} (ID: ${v.id})`;
+
+                    // TU ZMIANA: Dodajemy data-przebieg
+                    return `<option value="${v.id}" data-przebieg="${v.przebieg}" ${isSelected}>${label}</option>`;
+                }).join('');
+
+                // 3. GENEROWANIE OPCJI KIEROWCÓW
+                const driverOptions = drivers.map(d => {
+                    const isSelected = (record && record.kierowca === d.id) ? 'selected' : '';
+                    const name = (d.first_name || d.last_name) ? `${d.first_name} ${d.last_name}` : d.user_name;
+                    return `<option value="${d.id}" ${isSelected}>${name} (ID: ${d.id})</option>`;
+                }).join('');
+
+                // --- FUNKCJE POMOCNICZE ---
                 const fileInputRow = (label, fileId, removeId, dbField) => {
                     let html = `<div style="margin-top:10px;"><label style="font-weight:bold; font-size:0.9em;">${label}:</label><br><input type="file" id="${fileId}"></div>`;
                     if (record && record[dbField]) {
@@ -1309,7 +1339,22 @@
                     ).join('');
                 };
 
-                // Obliczanie "na żywo" w formularzu (JavaScript)
+                // --- NOWA FUNKCJA: AUTO-UZUPEŁNIANIE PRZEBIEGU ---
+                window.updateStartMileage = (selectElement) => {
+                    // Pobieramy wybraną opcję
+                    const selectedOption = selectElement.options[selectElement.selectedIndex];
+                    // Odczytujemy przebieg z atrybutu data-przebieg
+                    const mileage = selectedOption.getAttribute('data-przebieg');
+
+                    // Jeśli przebieg istnieje i pole input jest dostępne -> wpisujemy
+                    const inputStart = document.getElementById('h_przebieg_start');
+                    if (mileage && inputStart) {
+                        inputStart.value = mileage;
+                        // Przeliczamy koszty od razu, bo zmienił się start
+                        if (window.calculateRentCost) window.calculateRentCost();
+                    }
+                };
+
                 window.calculateRentCost = () => {
                     const start = parseInt(document.getElementById('h_przebieg_start').value) || 0;
                     const stop = parseInt(document.getElementById('h_przebieg_stop').value) || 0;
@@ -1324,10 +1369,23 @@
                     }
                 };
 
+                // --- GŁÓWNY HTML FORMULARZA ---
                 formHtml = `
                     <div style="display:flex; gap:10px;">
-                        <div style="flex:1;"><label>Pojazd:</label><input type="number" id="h_pojazd_id" value="${record?.pojazd || ''}" required></div>
-                        <div style="flex:1;"><label>Kierowca:</label><input type="number" id="h_kierowca_id" value="${record?.kierowca || ''}" required></div>
+                        <div style="flex:1;">
+                            <label>Pojazd:</label>
+                            <select id="h_pojazd_id" required onchange="updateStartMileage(this)" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                                <option value="" disabled ${!record ? 'selected' : ''}>-- Wybierz Pojazd --</option>
+                                ${vehicleOptions}
+                            </select>
+                        </div>
+                        <div style="flex:1;">
+                            <label>Kierowca:</label>
+                            <select id="h_kierowca_id" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                                <option value="" disabled ${!record ? 'selected' : ''}>-- Wybierz Kierowcę --</option>
+                                ${driverOptions}
+                            </select>
+                        </div>
                     </div>
 
                     <div style="background:#e9ecef; padding:10px; border-radius:5px; margin-top:10px;">
@@ -1360,12 +1418,17 @@
 
                     <label style="margin-top:10px;">Uwagi:</label><textarea id="h_uwagi" rows="2">${record?.uwagi || ''}</textarea>
 
-                    `;
+                    <h3 style="margin-top:20px; border-bottom:2px solid #007bff; padding-bottom:5px; color:#007bff; font-size:1em;">Dokumenty (Protokoły)</h3>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px;">
+                        ${fileInputRow('Umowa Najmu', 'h_scan_agreement', 'rm_h_agreement', 'scan_agreement')}
+                        ${fileInputRow('Protokół Wydania', 'h_scan_handover', 'rm_h_handover', 'scan_handover_protocol')}
+                        ${fileInputRow('Protokół Zwrotu', 'h_scan_return', 'rm_h_return', 'scan_return_protocol')}
+                    </div>
+                `;
 
                 // Wywołaj kalkulację po załadowaniu (jeśli edytujemy)
                 setTimeout(window.calculateRentCost, 500);
             }
-
             // 5. SZKODY
             else if (viewName === 'damages') {
                 const sel = (val) => (record?.status_naprawy === val ? 'selected' : '');
@@ -1437,7 +1500,7 @@
 
                 formHtml = `
                     <div style="background: #e9ecef; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
-                        <small style="color:#666; font-weight:bold;">DANE WNIOSKODAWCY (Tylko tekst):</small>
+                        <small style="color:#666; font-weight:bold;">DANE KIERUJĄCEGO (Tylko tekst):</small>
                         <div style="display:flex; gap:10px;">
                             <div style="flex:1;"><label>Imię:</label> <input type="text" id="r_first_name" value="${record?.first_name || ''}" required></div>
                             <div style="flex:1;"><label>Nazwisko:</label> <input type="text" id="r_last_name" value="${record?.last_name || ''}" required></div>
@@ -1448,7 +1511,7 @@
                     <div style="background: #d4edda; padding: 10px; border-radius: 5px; margin-bottom: 10px; border: 1px solid #c3e6cb;">
                         <small style="color:#155724; font-weight:bold;">WERYFIKACJA ADMINISTRATORA:</small>
 
-                        <label style="color: #155724;">Wybierz Kierowcę (Wymagane do Przekazania):</label>
+                        <label style="color: #155724;">Wybierz Użytkownika (Wymagane do Przekazania):</label>
                         <select id="r_driver_id" style="border: 1px solid #28a745; background: white;">${driverOptions}</select>
 
                         <label style="color: #007bff; margin-top:5px;">Przypisz pojazd:</label>
@@ -3124,11 +3187,14 @@
             const input = document.getElementById('table-search');
             if (!input) return;
 
-            const filter = input.value.toLowerCase();
-            const rows = document.querySelectorAll('.table-row');
+            const filter = input.value.toLowerCase().trim(); // Dodałem .trim() żeby usunąć spacje z brzegów
+
+            // POPRAWKA: Szukamy teraz obu rodzajów wierszy (zwykłych i tych mniejszych 'sm')
+            const rows = document.querySelectorAll('.table-row, .table-row-sm');
 
             rows.forEach(row => {
                 const text = row.textContent || row.innerText;
+                // Ustawiamy display na 'grid', bo tak masz w CSS dla tych klas
                 row.style.display = text.toLowerCase().includes(filter) ? "grid" : "none";
             });
         }
@@ -3627,6 +3693,14 @@
                 historyModal.style.display = "none";
             }
         });
+
+        // --- AKTYWACJA WYSZUKIWARKI ---
+        // Uruchamia filtrowanie przy każdym wpisanym znaku
+        const searchInput = document.getElementById('table-search');
+        if (searchInput) {
+            searchInput.addEventListener('keyup', filterTable);
+            searchInput.addEventListener('input', filterTable); // Obsługa też wklejania myszką/czyszczenia "X"
+        }
 
         function checkAuthentication() {
             const accessToken = localStorage.getItem('access_token');
