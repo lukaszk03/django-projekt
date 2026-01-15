@@ -1,0 +1,485 @@
+async function openModal(viewName, recordOrId = null) {
+            let record = null;
+            modalError.textContent = '';
+            modalForm.innerHTML = 'Ładowanie danych...';
+
+            // Logika pobierania danych (bez zmian)
+            if (recordOrId !== null) {
+                if (typeof recordOrId === 'object') {
+                    record = recordOrId;
+                    currentRecordId = record.id;
+                } else {
+                    currentRecordId = recordOrId;
+                    try {
+                        const endpoint = endpointMap[viewName] || viewName;
+                        const response = await fetch(`${API_BASE}${endpoint}/${currentRecordId}/`, {
+                            headers: getAuthHeaders()
+                        });
+                        if (response.ok) {
+                            record = await response.json();
+                        } else {
+                            throw new Error("Nie udało się pobrać danych rekordu.");
+                        }
+                    } catch (error) {
+                        modalError.textContent = "Błąd ładowania: " + error.message;
+                        return;
+                    }
+                }
+            } else {
+                currentRecordId = null;
+            }
+
+            modalTitle.textContent = currentRecordId ? `Edytuj rekord (${viewName})` : `Dodaj nowy rekord (${viewName})`;
+            deleteBtn.style.display = currentRecordId ? 'inline' : 'none';
+
+            let formHtml = '';
+            const isCalendarEventView = ['calendar', 'policies', 'tech_inspections', 'reviews', 'repairs', 'legalization', 'inspection'].includes(viewName);
+
+            // 1. DODAWANIE NOWEGO TERMINU (DLA WIDOKÓW KALENDARZOWYCH)
+            if (isCalendarEventView && !currentRecordId) {
+                modalTitle.textContent = `Dodaj Nowy Termin/Zdarzenie`;
+                const vehicles = await fetchVehicles();
+                const vehicleOptions = vehicles.map(v => `<option value="${v.id}">${v.registration_number} (ID: ${v.id})</option>`).join('');
+
+                formHtml = `
+                    <label for="event_type_selector">Rodzaj Zdarzenia:</label>
+                    <select id="event_type_selector" required onchange="updateFormFields(this.value)">
+                        <option value="" disabled selected>-- Wybierz rodzaj --</option>
+                        <option value="BADANIE_TECH">Badanie Techniczne</option>
+                        <option value="PRZEGLAD">Przegląd Okresowy</option>
+                        <option value="NAPRAWA">Naprawa</option>
+                        <option value="POLICY_OC">Polisa OC/AC</option>
+                    </select>
+                    <label for="pojazd_id_selector">Pojazd:</label>
+                    <select id="pojazd_id_selector" required>${vehicleOptions}</select>
+                    <div id="dynamic-fields-container"></div>
+                    <label for="data_terminu">Data Terminu:</label>
+                    <input type="date" id="data_terminu" required>
+                `;
+            }
+            // 2. POJAZDY
+            else if (viewName === 'vehicles') {
+                const sel = (f, v) => (record && record[f] === v) ? 'selected' : '';
+
+                // Funkcja pomocnicza generująca pole pliku z opcją usuwania
+                const fileInputRow = (label, fileId, removeId, dbField) => {
+                    let html = `<label style="margin-top:10px;">${label}:</label><input type="file" id="${fileId}">`;
+
+                    // Jeśli rekord istnieje i ma wgrany plik w danym polu
+                    if (record && record[dbField]) {
+                        html += `
+                            <div style="background: #fff3cd; padding: 5px; border: 1px solid #ffeeba; border-radius: 4px; display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
+                                <span style="color: green; font-weight: bold; font-size: 0.9em;">✅ Plik jest wgrany</span>
+                                <div style="display: flex; align-items: center; gap: 5px;">
+                                    <input type="checkbox" id="${removeId}" style="width: auto; margin: 0;">
+                                    <label for="${removeId}" style="color: #dc3545; font-weight: bold; font-size: 0.85em; margin: 0; cursor: pointer;">Usuń plik</label>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    return html;
+                };
+
+                formHtml = `
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                        <div><label>Marka:</label><input type="text" id="v_marka" value="${record?.marka || ''}"></div>
+                        <div><label>Model:</label><input type="text" id="v_model" value="${record?.model || ''}"></div>
+                    </div>
+
+                    <label>Nr Rej:</label><input type="text" id="reg_num" value="${record?.registration_number || ''}" required>
+                    <label>VIN:</label><input type="text" id="vin_num" value="${record?.vin || ''}" required>
+
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                        <div>
+                            <label>Typ:</label>
+                            <select id="v_type">
+                                <option value="OSOBOWE" ${sel('typ_pojazdu', 'OSOBOWE')}>Osobowe</option>
+                                <option value="CIEZAROWE" ${sel('typ_pojazdu', 'CIEZAROWE')}>Ciężarowe</option>
+                                <option value="AUTOBUSY" ${sel('typ_pojazdu', 'AUTOBUSY')}>Autobusy</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Paliwo:</label>
+                            <select id="fuel_type_input">
+                                <option value="DIESEL" ${sel('fuel_type', 'DIESEL')}>Diesel</option>
+                                <option value="BENZYNA" ${sel('fuel_type', 'BENZYNA')}>Benzyna</option>
+                                <option value="LPG" ${sel('fuel_type', 'LPG')}>LPG + Benzyna</option>
+                                <option value="HYBRID" ${sel('fuel_type', 'HYBRID')}>Hybryda (HEV)</option>
+                                <option value="PHEV" ${sel('fuel_type', 'PHEV')}>Hybryda Plug-in (PHEV)</option>
+                                <option value="ELECTRIC" ${sel('fuel_type', 'ELECTRIC')}>Elektryczny (EV)</option>
+                                <option value="CNG" ${sel('fuel_type', 'CNG')}>CNG</option>
+                                <option value="HYDROGEN" ${sel('fuel_type', 'HYDROGEN')}>Wodorowy</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <label>Przebieg:</label><input type="number" id="przebieg_val" value="${record?.przebieg || ''}">
+                    <label>Status:</label>
+                    <select id="v_status">
+                        <option value="SPRAWNY" ${sel('status', 'SPRAWNY')}>Sprawny</option>
+                        <option value="NIESPRAWNY" ${sel('status', 'NIESPRAWNY')}>Niesprawny</option>
+                    </select>
+
+                    <input type="hidden" id="company_id" value="${record?.company || ''}">
+                    <input type="hidden" id="v_assigned_user" value="${record?.assigned_user || ''}">
+
+                    <label>Uwagi:</label><textarea id="v_uwagi">${record?.uwagi || ''}</textarea>
+
+                    <h3 style="margin-top:20px; border-bottom:2px solid #007bff; padding-bottom:5px; color:#007bff;">Dokumenty (Dodaj / Usuń)</h3>
+
+                    ${fileInputRow('Skan Dowodu Rej.', 'v_scan_registration', 'rm_scan_registration', 'scan_registration_card')}
+                    ${fileInputRow('Polisa OC', 'v_scan_oc', 'rm_scan_oc', 'scan_policy_oc')}
+                    ${fileInputRow('Polisa AC', 'v_scan_ac', 'rm_scan_ac', 'scan_policy_ac')}
+                    ${fileInputRow('Badanie Techniczne', 'v_scan_tech', 'rm_scan_tech', 'scan_tech_inspection')}
+                    ${fileInputRow('Książka Serwisowa', 'v_scan_service', 'rm_scan_service', 'scan_service_book')}
+                    ${fileInputRow('Faktura Zakupu', 'v_scan_invoice', 'rm_scan_invoice', 'scan_purchase_invoice')}
+                `;
+            }
+            // 3. KIEROWCY
+            else if (viewName === 'drivers') {
+                formHtml = `
+                    <label>User ID:</label><input type="number" id="d_user_id" value="${record?.user || ''}" ${currentRecordId ? 'disabled' : ''}>
+                    <label>Firma ID:</label><input type="number" id="d_company_id" value="${record?.company || ''}">
+                    <label>Nr Prawa Jazdy:</label><input type="text" id="prawa_jazdy_num" value="${record?.numer_prawa_jazdy || ''}">
+                    <label>Kategorie:</label><input type="text" id="kat_prawa_jazdy" value="${record?.kategorie_prawa_jazdy || 'B'}">
+                    <label>Ważność PJ:</label><input type="date" id="data_waznosci_pj_val" value="${record?.data_waznosci_prawa_jazdy || ''}" required>
+                    <label>Badania lek:</label><input type="date" id="data_badan_val" value="${record?.data_waznosci_badan || ''}">
+                `;
+            }
+            // 4. PRZEKAZANIA (ZAKTUALIZOWANE: DROPDOWNY + AUTO-PRZEBIEG)
+            else if (viewName === 'handover') {
+
+                // 1. POBIERANIE LIST DO DROPDOWNÓW
+                let vehicles = [];
+                let drivers = [];
+
+                try {
+                    const [vRes, dRes] = await Promise.all([
+                        fetch(API_BASE + 'vehicles/', { headers: getAuthHeaders() }),
+                        fetch(API_BASE + 'drivers/', { headers: getAuthHeaders() })
+                    ]);
+                    if (vRes.ok) vehicles = await vRes.json();
+                    if (dRes.ok) drivers = await dRes.json();
+                } catch (e) { console.error("Błąd pobierania słowników:", e); }
+
+                // 2. GENEROWANIE OPCJI POJAZDÓW (Z DODANYM ATRYBUTEM data-przebieg)
+                const vehicleOptions = vehicles.map(v => {
+                    const isSelected = (record && record.pojazd === v.id) ? 'selected' : '';
+                    const label = `${v.marka} ${v.model} - ${v.registration_number} (ID: ${v.id})`;
+
+                    // TU ZMIANA: Dodajemy data-przebieg
+                    return `<option value="${v.id}" data-przebieg="${v.przebieg}" ${isSelected}>${label}</option>`;
+                }).join('');
+
+                // 3. GENEROWANIE OPCJI KIEROWCÓW
+                const driverOptions = drivers.map(d => {
+                    const isSelected = (record && record.kierowca === d.id) ? 'selected' : '';
+                    const name = (d.first_name || d.last_name) ? `${d.first_name} ${d.last_name}` : d.user_name;
+                    return `<option value="${d.id}" ${isSelected}>${name} (ID: ${d.id})</option>`;
+                }).join('');
+
+                // --- FUNKCJE POMOCNICZE ---
+                const fileInputRow = (label, fileId, removeId, dbField) => {
+                    let html = `<div style="margin-top:10px;"><label style="font-weight:bold; font-size:0.9em;">${label}:</label><br><input type="file" id="${fileId}"></div>`;
+                    if (record && record[dbField]) {
+                        html += `
+                            <div style="background: #e2e3e5; padding: 5px; border-radius: 4px; display: flex; align-items: center; gap: 10px; margin-top: 2px;">
+                                <a href="${record[dbField]}" target="_blank" style="color: blue; text-decoration: none; font-size:0.85em;">📄 Zobacz obecny</a>
+                                <div style="display: flex; align-items: center; gap: 5px; margin-left:auto;">
+                                    <input type="checkbox" id="${removeId}" style="width: auto; margin: 0;">
+                                    <label for="${removeId}" style="color: #dc3545; font-size: 0.85em; margin: 0; cursor: pointer;">Usuń</label>
+                                </div>
+                            </div>`;
+                    }
+                    return html;
+                };
+
+                const fuelOptions = (selected) => {
+                    const opts = {'0':'Rezerwa', '25':'1/4', '50':'1/2', '75':'3/4', '100':'Pełny'};
+                    return Object.entries(opts).map(([k, v]) =>
+                        `<option value="${k}" ${String(selected) === k ? 'selected' : ''}>${v}</option>`
+                    ).join('');
+                };
+
+                // --- NOWA FUNKCJA: AUTO-UZUPEŁNIANIE PRZEBIEGU ---
+                window.updateStartMileage = (selectElement) => {
+                    // Pobieramy wybraną opcję
+                    const selectedOption = selectElement.options[selectElement.selectedIndex];
+                    // Odczytujemy przebieg z atrybutu data-przebieg
+                    const mileage = selectedOption.getAttribute('data-przebieg');
+
+                    // Jeśli przebieg istnieje i pole input jest dostępne -> wpisujemy
+                    const inputStart = document.getElementById('h_przebieg_start');
+                    if (mileage && inputStart) {
+                        inputStart.value = mileage;
+                        // Przeliczamy koszty od razu, bo zmienił się start
+                        if (window.calculateRentCost) window.calculateRentCost();
+                    }
+                };
+
+                window.calculateRentCost = () => {
+                    const start = parseInt(document.getElementById('h_przebieg_start').value) || 0;
+                    const stop = parseInt(document.getElementById('h_przebieg_stop').value) || 0;
+                    const stawka = parseFloat(document.getElementById('h_stawka').value) || 0;
+                    const doplata = parseFloat(document.getElementById('h_doplata').value) || 0;
+
+                    if (stop > start) {
+                        const dist = stop - start;
+                        const total = (dist * stawka) + doplata;
+                        document.getElementById('calc_dystans').innerText = dist + ' km';
+                        document.getElementById('calc_total').innerText = total.toFixed(2) + ' PLN';
+                    }
+                };
+
+                // --- GŁÓWNY HTML FORMULARZA ---
+                formHtml = `
+                    <div style="display:flex; gap:10px;">
+                        <div style="flex:1;">
+                            <label>Pojazd:</label>
+                            <select id="h_pojazd_id" required onchange="updateStartMileage(this)" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                                <option value="" disabled ${!record ? 'selected' : ''}>-- Wybierz Pojazd --</option>
+                                ${vehicleOptions}
+                            </select>
+                        </div>
+                        <div style="flex:1;">
+                            <label>Kierowca:</label>
+                            <select id="h_kierowca_id" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                                <option value="" disabled ${!record ? 'selected' : ''}>-- Wybierz Kierowcę --</option>
+                                ${driverOptions}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="background:#e9ecef; padding:10px; border-radius:5px; margin-top:10px;">
+                        <strong style="color:#007bff;">1. WYDANIE POJAZDU</strong>
+                        <div style="display:flex; gap:10px; margin-top:5px;">
+                            <div style="flex:1;"><label>Data Wydania:</label><input type="date" id="h_data_wydania" value="${record?.data_wydania || ''}" required></div>
+                            <div style="flex:1;"><label>Przebieg Start (km):</label><input type="number" id="h_przebieg_start" value="${record?.przebieg_start || 0}" oninput="calculateRentCost()"></div>
+                            <div style="flex:1;"><label>Paliwo Start:</label><select id="h_paliwo_start">${fuelOptions(record?.paliwo_start || '100')}</select></div>
+                        </div>
+                    </div>
+
+                    <div style="background:#d4edda; padding:10px; border-radius:5px; margin-top:10px; border:1px solid #c3e6cb;">
+                        <strong style="color:#155724;">2. ZWROT I ROZLICZENIE</strong>
+                        <div style="display:flex; gap:10px; margin-top:5px;">
+                            <div style="flex:1;"><label>Data Zwrotu:</label><input type="date" id="h_data_zwrotu" value="${record?.data_zwrotu || ''}"></div>
+                            <div style="flex:1;"><label>Przebieg Koniec (km):</label><input type="number" id="h_przebieg_stop" value="${record?.przebieg_stop || ''}" oninput="calculateRentCost()"></div>
+                            <div style="flex:1;"><label>Paliwo Koniec:</label><select id="h_paliwo_stop">${fuelOptions(record?.paliwo_stop || '')}</select></div>
+                        </div>
+
+                        <div style="display:flex; gap:10px; margin-top:10px; border-top:1px solid #ccc; padding-top:10px;">
+                            <div style="flex:1;"><label>Stawka za km (PLN):</label><input type="number" step="0.01" id="h_stawka" value="${record?.stawka_za_km || '0.50'}" oninput="calculateRentCost()"></div>
+                            <div style="flex:1;"><label>Dopłata Paliwo (PLN):</label><input type="number" step="0.01" id="h_doplata" value="${record?.koszt_brakujacego_paliwa || '0'}" oninput="calculateRentCost()"></div>
+                        </div>
+
+                        <div style="margin-top:10px; font-weight:bold; text-align:right; font-size:1.1em;">
+                            Dystans: <span id="calc_dystans" style="color:#007bff;">0 km</span> |
+                            SUMA: <span id="calc_total" style="color:#28a745;">0.00 PLN</span>
+                        </div>
+                    </div>
+
+                    <label style="margin-top:10px;">Uwagi:</label><textarea id="h_uwagi" rows="2">${record?.uwagi || ''}</textarea>
+
+                    <h3 style="margin-top:20px; border-bottom:2px solid #007bff; padding-bottom:5px; color:#007bff; font-size:1em;">Dokumenty (Protokoły)</h3>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px;">
+                        ${fileInputRow('Umowa Najmu', 'h_scan_agreement', 'rm_h_agreement', 'scan_agreement')}
+                        ${fileInputRow('Protokół Wydania', 'h_scan_handover', 'rm_h_handover', 'scan_handover_protocol')}
+                        ${fileInputRow('Protokół Zwrotu', 'h_scan_return', 'rm_h_return', 'scan_return_protocol')}
+                    </div>
+                `;
+
+                // Wywołaj kalkulację po załadowaniu (jeśli edytujemy)
+                setTimeout(window.calculateRentCost, 500);
+            }
+            // 5. SZKODY
+            else if (viewName === 'damages') {
+                const sel = (val) => (record?.status_naprawy === val ? 'selected' : '');
+                formHtml = `
+                    <label>ID Pojazdu:</label><input type="number" id="pojazd_id" value="${record?.pojazd || ''}" required>
+                    <label>Data:</label><input type="date" id="data_zdarzenia_val" value="${record?.data_zdarzenia || ''}" required>
+                    <label>Status:</label>
+                    <select id="status_naprawy_val">
+                        <option value="ZGLOSZONA" ${sel('ZGLOSZONA')}>Zgłoszona</option>
+                        <option value="W_NAPRAWIE" ${sel('W_NAPRAWIE')}>W naprawie</option>
+                        <option value="ZAMKNIETA" ${sel('ZAMKNIETA')}>Zamknięta</option>
+                    </select>
+                    <label>Opis:</label><textarea id="opis_szkody">${record?.opis || ''}</textarea>
+                `;
+            }
+            // ... (wcześniejszy kod openModal) ...
+
+            // 6. REZERWACJE (POPRAWIONE)
+            else if (viewName === 'reservations') {
+                // 1. POBIERANIE LISTY POJAZDÓW
+                let vehicleOptions = '<option value="">-- Brak / Dowolny --</option>';
+                try {
+                    const vehicles = await fetchVehicles();
+                    vehicleOptions += vehicles.map(v => {
+                        const isSelected = (record && record.assigned_vehicle === v.id) ? 'selected' : '';
+                        let statusIcon = '❓';
+                        if (v.status === 'SPRAWNY') statusIcon = '✅';
+                        else if (v.status === 'NIESPRAWNY') statusIcon = '❌';
+
+                        return `<option value="${v.id}" ${isSelected}>
+                            ${v.registration_number} (${v.marka} ${v.model}) — ${statusIcon} ${v.status}
+                        </option>`;
+                    }).join('');
+                } catch (e) { console.error(e); }
+
+                // 2. POBIERANIE LISTY KIEROWCÓW
+                let driverOptions = '<option value="">-- Wybierz Użytkownika z Systemu --</option>';
+                try {
+                    const response = await fetch(API_BASE + 'drivers/', { headers: getAuthHeaders() });
+                    if (response.ok) {
+                        const drivers = await response.json();
+                        drivers.forEach(d => {
+                            const name = (d.first_name || d.last_name) ? `${d.first_name} ${d.last_name}` : d.user_name;
+                            const isSel = (record && record.driver === d.id) ? 'selected' : '';
+                            driverOptions += `<option value="${d.id}" ${isSel}>${name}</option>`;
+                        });
+                    }
+                } catch(e) { console.error(e); }
+
+                const sel = (val) => (record?.vehicle_type === val ? 'selected' : '');
+                const stSel = (val) => (record?.status === val ? 'selected' : '');
+
+                let attachmentsHtml = '';
+                if (record && record.attachments && record.attachments.length > 0) {
+                    attachmentsHtml = '<div style="margin-top: 5px; background: #fff; border: 1px solid #ccc; padding: 10px; border-radius: 4px;"><strong>Załączone pliki:</strong><ul style="list-style: none; padding-left: 0; margin-top: 5px;">';
+                    record.attachments.forEach(file => {
+                        const fileName = file.file.split('/').pop();
+                        attachmentsHtml += `
+                            <li style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px solid #eee;">
+                                <a href="${file.file}" target="_blank" style="color: blue; text-decoration: none;">📄 ${fileName}</a>
+                                <div style="display: flex; align-items: center; gap: 5px;">
+                                    <input type="checkbox" class="remove-attachment-cb" value="${file.id}" id="remove_file_${file.id}">
+                                    <label for="remove_file_${file.id}" style="color: #dc3545; font-size: 0.85em; cursor: pointer;">Usuń</label>
+                                </div>
+                            </li>`;
+                    });
+                    attachmentsHtml += '</ul></div>';
+                }
+
+                formHtml = `
+                    <div style="background: #e9ecef; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+                        <small style="color:#666; font-weight:bold;">DANE KIERUJĄCEGO (Tylko tekst):</small>
+                        <div style="display:flex; gap:10px;">
+                            <div style="flex:1;"><label>Imię:</label> <input type="text" id="r_first_name" value="${record?.first_name || ''}" required></div>
+                            <div style="flex:1;"><label>Nazwisko:</label> <input type="text" id="r_last_name" value="${record?.last_name || ''}" required></div>
+                        </div>
+                        <label>Firma:</label> <input type="text" id="r_company" value="${record?.company || ''}" required>
+                    </div>
+
+                    <div style="background: #d4edda; padding: 10px; border-radius: 5px; margin-bottom: 10px; border: 1px solid #c3e6cb;">
+                        <small style="color:#155724; font-weight:bold;">WERYFIKACJA DYSPOZYTORA:</small>
+
+                        <label style="color: #155724;">Wybierz Użytkownika (Wymagane do Przekazania):</label>
+                        <select id="r_driver_id" style="border: 1px solid #28a745; background: white;">${driverOptions}</select>
+
+                        <label style="color: #007bff; margin-top:5px;">Przypisz pojazd:</label>
+                        <select id="r_assigned_vehicle" style="border: 1px solid #007bff; background:#f0f8ff;"> ${vehicleOptions} </select>
+
+                        <label style="margin-top:5px;">Status:</label>
+                        <select id="r_status" style="font-weight:bold;">
+                            <option value="OCZEKUJACE" ${stSel('OCZEKUJACE')}>Oczekujące</option>
+                            <option value="PRZYJETE" ${stSel('PRZYJETE')}>Przyjęte</option>
+                            <option value="ZATWIERDZONE" ${stSel('ZATWIERDZONE')}>✅ ZATWIERDZONE (Generuje wydanie)</option>
+                            <option value="ODRZUCONE" ${stSel('ODRZUCONE')}>Odrzucone</option>
+                        </select>
+                    </div>
+
+                    <div style="display:flex; gap:10px;">
+                        <div style="flex:1;">
+                            <label>Data Od:</label>
+                            <input type="date" id="r_date_from" value="${record?.date_from || ''}" required onchange="updateVehicleAvailability()">
+                        </div>
+                        <div style="flex:1;">
+                            <label>Data Do:</label>
+                            <input type="date" id="r_date_to" value="${record?.date_to || ''}" required onchange="updateVehicleAvailability()">
+                        </div>
+                    </div>
+
+                    <label>Preferowany Typ:</label>
+                    <select id="r_vehicle_type">
+                        <option value="OSOBOWE" ${sel('OSOBOWE')}>Osobowe</option>
+                        <option value="CIEZAROWE" ${sel('CIEZAROWE')}>Ciężarowe</option>
+                        <option value="AUTOBUSY" ${sel('AUTOBUSY')}>Autobusy</option>
+                        <option value="SUV" ${sel('SUV')}>SUV</option>
+                        <option value="KOMBI" ${sel('KOMBI')}>Kombi</option>
+                    </select>
+
+                    <label style="margin-top: 10px;">Dodatkowe informacje:</label>
+                    <textarea id="r_additional_info" rows="2">${record?.additional_info || ''}</textarea>
+
+                    <label style="margin-top: 15px; font-weight:bold; color: #28a745;">Dodaj pliki:</label>
+                    <input type="file" id="r_new_files" multiple accept="application/pdf,image/*">
+
+                    ${attachmentsHtml}
+                `;
+
+                if (record && record.date_from && record.date_to) {
+                    setTimeout(updateVehicleAvailability, 200);
+                }
+            }
+            // 7. EDYCJA ISTNIEJĄCYCH ZDARZEŃ (POLISY, BADANIA, NAPRAWY)
+            else if (isCalendarEventView && currentRecordId) {
+                 const endpointForType = endpointMap[viewName];
+
+                 if (endpointForType === 'service_events') {
+                      formHtml = `
+                        <input type="hidden" id="typ_zdarzenia_val" value="${record.typ_zdarzenia}">
+                        <label>ID Pojazdu:</label>
+                        <input type="number" id="pojazd_id" value="${record.pojazd}" required>
+                        <label>Opis:</label>
+                        <textarea id="opis_serwisu" required>${record.opis}</textarea>
+                        <label>Koszt (PLN):</label>
+                        <input type="number" id="koszt_val" step="0.01" value="${record.koszt}" required>
+                        <label>Data Zdarzenia/Badania:</label>
+                        <input type="date" id="data_serwisu_val" value="${record.data_serwisu}" required>
+                    `;
+                } else if (endpointForType === 'policies') {
+                      formHtml = `
+                            <label>ID Pojazdu:</label>
+                            <input type="number" id="pojazd_id" value="${record.pojazd}" required>
+                            <label>Numer Polisy:</label>
+                            <input type="text" id="numer_polisy" value="${record.numer_polisy}" required>
+                            <label>Ubezpieczyciel:</label> <input type="text" id="ubezpieczyciel_val" value="${record.ubezpieczyciel || ''}" required>
+
+                            <label>Koszt (PLN):</label>
+                            <input type="number" id="koszt_val" step="0.01" value="${record.koszt || 0}">
+
+                            <label>Data Ważności OC:</label>
+                            <input type="date" id="data_waznosci_oc" value="${record.data_waznosci_oc}" required>
+                            <label>Data Ważności AC:</label>
+                            <input type="date" id="data_waznosci_ac" value="${record.data_waznosci_ac || ''}">
+                        `;
+                 }
+            }
+
+            // 8. NOWE DOKUMENTY POJAZDU (UPLOAD)
+            else if (viewName === 'vehicle_documents') {
+                modalTitle.textContent = "Dodaj Dokument Pojazdu";
+
+                const vehicles = await fetchVehicles();
+                const vehicleOptions = vehicles.map(v => `<option value="${v.id}">${v.registration_number}</option>`).join('');
+
+                formHtml = `
+                    <label>Pojazd:</label>
+                    <select id="doc_vehicle_id" required>
+                        ${vehicleOptions}
+                    </select>
+
+                    <label>Tytuł Dokumentu:</label>
+                    <input type="text" id="doc_title" placeholder="np. Dowód Rejestracyjny, Ubezpieczenie 2026" required>
+
+                    <label>Plik (PDF/JPG):</label>
+                    <input type="file" id="doc_file" required>
+
+                    <label>Opis (opcjonalnie):</label>
+                    <textarea id="doc_desc" rows="2"></textarea>
+                `;
+            }
+
+            modalForm.innerHTML = formHtml;
+            modal.style.display = "block";
+        }

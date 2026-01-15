@@ -31,8 +31,32 @@ from .models import (
 
 # 1. WIDOK DLA POJAZDÓW
 class VehicleViewSet(viewsets.ModelViewSet):
-    queryset = Vehicle.objects.select_related('company').all()
     serializer_class = VehicleDto
+    # queryset usuwamy z atrybutów klasy, bo jest dynamiczny w get_queryset
+
+    def get_queryset(self):
+        """
+        Nadpisujemy standardowe zapytanie, aby filtrować dane w zależności od roli.
+        """
+        user = self.request.user
+
+        # Podstawowe zapytanie: pobierz wszystkie auta + firmę
+        queryset = Vehicle.objects.select_related('company').all()
+
+        # JEŚLI to Kierowca lub Pracownik -> filtrujemy widoczność
+        if user.is_authenticated and user.rola in ['DRIVER', 'USER']:
+            # 1. Pobieramy ID aut, które użytkownik ma aktualnie (niezwrócone przekazania)
+            current_handover_ids = VehicleHandover.objects.filter(
+                kierowca__user=user,
+                data_zwrotu__isnull=True
+            ).values_list('pojazd_id', flat=True)
+
+            # 2. Zwracamy auta: Przypisane na stałe (assigned_user) LUB aktualnie wypożyczone
+            queryset = queryset.filter(
+                Q(assigned_user=user) | Q(id__in=current_handover_ids)
+            ).distinct()
+
+        return queryset
 
     # --- NOWA METODA DLA APLIKACJI MOBILNEJ (MOJE POJAZDY) ---
     @action(detail=False, methods=['get'])
@@ -234,27 +258,51 @@ class DriverViewSet(viewsets.ModelViewSet):
 
 # 3. WIDOK DLA ZDARZEŃ SERWISOWYCH (POPRAWIONE FILTROWANIE)
 class ServiceEventViewSet(viewsets.ModelViewSet):
-    queryset = ServiceEvent.objects.select_related('pojazd').all().order_by('-data_serwisu')
     serializer_class = ServiceEventDto
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        user = self.request.user
+        queryset = ServiceEvent.objects.select_related('pojazd').all().order_by('-data_serwisu')
+
+        if user.is_authenticated and user.rola in ['DRIVER', 'USER']:
+            current_handover_ids = VehicleHandover.objects.filter(
+                kierowca__user=user,
+                data_zwrotu__isnull=True
+            ).values_list('pojazd_id', flat=True)
+
+            queryset = queryset.filter(
+                Q(pojazd__assigned_user=user) | Q(pojazd__id__in=current_handover_ids)
+            ).distinct()
+
         vehicle_id = self.request.query_params.get('vehicle')
         if vehicle_id:
             queryset = queryset.filter(pojazd_id=vehicle_id)
+
         return queryset
 
 
-# 4. WIDOK DLA ZDARZEŃ SZKODOWYCH (POPRAWIONE FILTROWANIE)
+# 4. WIDOK DLA ZDARZEŃ SZKODOWYCH
 class DamageEventViewSet(viewsets.ModelViewSet):
-    queryset = DamageEvent.objects.select_related('pojazd').all().order_by('-data_zdarzenia')
     serializer_class = DamageEventDto
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        user = self.request.user
+        queryset = DamageEvent.objects.select_related('pojazd').all().order_by('-data_zdarzenia')
+
+        if user.is_authenticated and user.rola in ['DRIVER', 'USER']:
+            current_handover_ids = VehicleHandover.objects.filter(
+                kierowca__user=user,
+                data_zwrotu__isnull=True
+            ).values_list('pojazd_id', flat=True)
+
+            queryset = queryset.filter(
+                Q(pojazd__assigned_user=user) | Q(pojazd__id__in=current_handover_ids)
+            ).distinct()
+
         vehicle_id = self.request.query_params.get('vehicle')
         if vehicle_id:
             queryset = queryset.filter(pojazd_id=vehicle_id)
+
         return queryset
 
     def _update_vehicle_status(self, vehicle):
@@ -285,39 +333,83 @@ class DamageEventViewSet(viewsets.ModelViewSet):
 
 # 5. WIDOK DLA POLIS (POPRAWIONE FILTROWANIE)
 class InsurancePolicyViewSet(viewsets.ModelViewSet):
-    queryset = InsurancePolicy.objects.select_related('pojazd').all()
     serializer_class = InsurancePolicyDto
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        user = self.request.user
+        queryset = InsurancePolicy.objects.select_related('pojazd').all()
+
+        if user.is_authenticated and user.rola in ['DRIVER', 'USER']:
+            current_handover_ids = VehicleHandover.objects.filter(
+                kierowca__user=user,
+                data_zwrotu__isnull=True
+            ).values_list('pojazd_id', flat=True)
+
+            queryset = queryset.filter(
+                Q(pojazd__assigned_user=user) | Q(pojazd__id__in=current_handover_ids)
+            ).distinct()
+
         vehicle_id = self.request.query_params.get('vehicle')
         if vehicle_id:
             queryset = queryset.filter(pojazd_id=vehicle_id)
+
         return queryset
 
 
-# 6. WIDOK DLA PRZEKAZAŃ (POPRAWIONE FILTROWANIE)
+# 6. WIDOK DLA PRZEKAZAŃ
 class VehicleHandoverViewSet(viewsets.ModelViewSet):
-    queryset = VehicleHandover.objects.select_related('kierowca__user', 'kierowca__company', 'pojazd').all().order_by('-data_wydania')
     serializer_class = VehicleHandoverDto
     permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        user = self.request.user
+        queryset = VehicleHandover.objects.select_related('kierowca__user', 'kierowca__company', 'pojazd').all().order_by('-data_wydania')
+
+        if user.is_authenticated and user.rola in ['DRIVER', 'USER']:
+            queryset = queryset.filter(kierowca__user=user)
+
         vehicle_id = self.request.query_params.get('vehicle')
         if vehicle_id:
             queryset = queryset.filter(pojazd_id=vehicle_id)
+
         return queryset
 
 
 # 7. WIDOK DLA REZERWACJI
 class ReservationViewSet(viewsets.ModelViewSet):
-    queryset = Reservation.objects.all().order_by('-created_at')
     serializer_class = ReservationDto
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = Reservation.objects.all().order_by('-created_at')
+
+        if user.is_authenticated and user.rola in ['DRIVER', 'USER']:
+            try:
+                driver_profile = Driver.objects.get(user=user)
+                queryset = queryset.filter(driver=driver_profile)
+            except Driver.DoesNotExist:
+                return Reservation.objects.none()
+
+        return queryset
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if user.rola in ['DRIVER', 'USER']:
+            try:
+                driver_profile = Driver.objects.get(user=user)
+                serializer.save(
+                    driver=driver_profile,
+                    first_name=user.first_name,
+                    last_name=user.last_name,
+                    company=driver_profile.company.nazwa if driver_profile.company else ''
+                )
+            except Driver.DoesNotExist:
+                serializer.save()
+        else:
+            serializer.save()
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        # Automatyczne tworzenie wydania przy zatwierdzeniu
         if instance.status == 'ZATWIERDZONE' and instance.assigned_vehicle and instance.driver:
             exists = VehicleHandover.objects.filter(
                 pojazd=instance.assigned_vehicle,
@@ -337,25 +429,14 @@ class ReservationViewSet(viewsets.ModelViewSet):
 
 # 8. WIDOK DLA DOKUMENTÓW I USTAWIEŃ
 class VehicleDocumentViewSet(viewsets.ModelViewSet):
-    # Podstawowe zapytanie (wszystkie dokumenty, posortowane od najnowszych)
     queryset = VehicleDocument.objects.select_related('vehicle').all().order_by('-uploaded_at')
     serializer_class = VehicleDocumentDto
 
     def get_queryset(self):
-        """
-        Nadpisujemy metodę pobierania danych, aby obsłużyć filtrowanie.
-        Dzięki temu zapytanie api/vehicle_documents/?vehicle=5 zwróci tylko pliki tego auta.
-        """
-        # Bierzemy podstawowy queryset zdefiniowany wyżej
         queryset = super().get_queryset()
-
-        # Pobieramy parametr 'vehicle' z adresu URL (jeśli istnieje)
         vehicle_id = self.request.query_params.get('vehicle')
-
-        # Jeśli parametr został podany, filtrujemy listę
         if vehicle_id:
             queryset = queryset.filter(vehicle_id=vehicle_id)
-
         return queryset
 
 

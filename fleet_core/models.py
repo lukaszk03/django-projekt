@@ -7,13 +7,6 @@ from django.core.exceptions import ValidationError
 
 # --- DEFINICJE STAŁYCH ---
 
-ROLES = (
-    ('ADMIN', 'Administrator'),
-    ('MANAGER', 'Menedżer Floty'),
-    ('DRIVER', 'Kierowca'),
-    ('EMPLOYEE', 'Pracownik (Dział HR/Finanse)'),
-)
-
 FUEL_TYPES = [
     ('BENZYNA', 'Benzyna'),
     ('DIESEL', 'Diesel'),
@@ -38,10 +31,27 @@ class FleetCompany(models.Model):
 
 
 # Rozszerzony User
-class CustomUser(AbstractUser):
-    rola = models.CharField(max_length=50, choices=ROLES, default='EMPLOYEE')
-    pin_2fa = models.CharField(max_length=6, blank=True, null=True, verbose_name="PIN 2FA")
+from django.contrib.auth.models import AbstractUser
+from django.db import models
 
+
+# Rozszerzony User
+class CustomUser(AbstractUser):
+    # Definicja ról (Klucze po lewej muszą pasować do tych w JavaScript)
+    ROLA_CHOICES = (
+        ('ADMIN', 'Administrator Systemu'),
+        ('LOGISTYKA', 'Dział Logistyki (Pojazdy, Kierowcy)'),
+        ('SERWIS', 'Dział Serwisu (Naprawy, Szkody)'),
+        ('KSIĘGOWOŚĆ', 'Dział Księgowości (Tylko do odczytu)'),
+        ('DRIVER', 'Kierowca (Aplikacja Mobilna)'),
+        ('USER', 'Pracownik (Składanie Rezerwacji)'),
+    )
+
+    # Pole rola z nowym domyślnym ustawieniem 'USER'
+    rola = models.CharField(max_length=20, choices=ROLA_CHOICES, default='USER')
+
+    # Twoje istniejące pole PIN (zachowane bez zmian)
+    pin_2fa = models.CharField(max_length=6, blank=True, null=True, verbose_name="PIN 2FA")
 
 class Vehicle(models.Model):
     """
