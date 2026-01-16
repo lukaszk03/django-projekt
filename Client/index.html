@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <title>FLEETSYS - Pełny Interfejs Floty</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚛</text></svg>">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <style>
+        /* Styl dla dymków na mapie */
+        .custom-map-popup b { font-size: 1.1em; color: #2c3e50; display:block; margin-bottom:4px; }
+        .custom-map-popup span { font-size: 0.9em; color: #555; }
+    </style>
     <style>
         /* CSS dla całego układu */
         body {
@@ -178,14 +185,14 @@
             background-color: #2c3e50;
             transition: color 0.3s ease;
         }
-        
-        .menu-subitem:hover { 
+
+        .menu-subitem:hover {
             color: #ffffff; /* Biały po najechaniu */
-            background-color: #34495e; 
+            background-color: #34495e;
         }
-        
-        .menu-subitem.active { 
-            color: #ffffff; 
+
+        .menu-subitem.active {
+            color: #ffffff;
             font-weight: bold;
             background-color: #34495e;
         }
@@ -536,6 +543,9 @@
             <div class="menu-item" data-view="damages">
                 <i class="fas fa-car-burst"></i> <span>Szkody</span>
             </div>
+            <div class="menu-item" data-view="map">
+                <i class="fas fa-map-marked-alt"></i> <span>Mapa Floty</span>
+            </div>
             <div class="menu-item" data-view="calendar">
                 <i class="fas fa-calendar-days"></i> <span>Terminarz</span>
             </div>
@@ -545,7 +555,7 @@
             <div class="menu-subitem" data-view="reviews"><span class="color-dot dot-review"></span>Przeglądy</div>
             <div class="menu-subitem" data-view="repairs"><span class="color-dot dot-repair"></span>Naprawy</div>
 
-         
+
             <div class="menu-item" data-view="hr_docs">
                 <i class="fas fa-folder-open"></i> <span>Dokumenty</span>
             </div>
@@ -665,12 +675,12 @@
             },
             'LOGISTYKA': {
                 // Widzi: Pojazdy, Kierowcy, Przekazania, Rezerwacje, Terminarz, Historia
-                allowed: ['vehicles', 'drivers', 'handover', 'reservations', 'calendar', 'vehicle_history'],
+                allowed: ['vehicles', 'drivers', 'handover', 'reservations', 'calendar', 'vehicle_history', 'map'],
                 readOnly: false
             },
             'SERWIS': {
                 // Widzi: Pojazdy, Szkody, Terminarz, Polisy, Badania, Przeglądy, Naprawy, Historia
-                allowed: ['vehicles', 'damages', 'calendar', 'policies', 'tech_inspections', 'reviews', 'repairs', 'vehicle_history'],
+                allowed: ['vehicles', 'damages', 'calendar', 'policies', 'tech_inspections', 'reviews', 'repairs', 'vehicle_history', 'map'],
                 readOnly: false
             },
             'KSIĘGOWOŚĆ': {
@@ -679,6 +689,7 @@
                 readOnly: true // Domyślnie wszystko zablokowane (ale zrobimy wyjątek dla plików)
             },
             'DRIVER': {
+                // Dodałem 'map' na końcu listy
                 allowed: ['vehicles', 'reservations', 'calendar', 'damages', 'vehicle_history', 'handover'],
                 readOnly: false
             }
@@ -2807,8 +2818,8 @@
             currentView = 'handover';
             viewTitle.textContent = 'Przekazania Pojazdów';
 
-            // Grid: Lp, Imie, Nazwisko, Firma, Marka, Model, Rej, Wydanie, Zwrot, UWAGI, Akcje
-            const gridLayout = "40px 100px 110px 100px 100px 100px 100px 110px 110px 1fr 100px";
+            // Grid: 12 kolumn (dodana kolumna Status - 120px)
+            const gridLayout = "40px 100px 110px 100px 100px 100px 100px 110px 110px 120px 1fr 100px";
 
             mainContent.innerHTML = `
                 <div class="table-header" style="display: grid; grid-template-columns: ${gridLayout}; gap: 10px; padding: 10px; background: #ebedef; font-weight: bold; border-bottom: 2px solid #ccc; font-size: 0.85em; align-items: center;">
@@ -2821,7 +2832,9 @@
                     <div>Rejestracja</div>
                     <div>Data Przyp.</div>
                     <div>Data Oddania</div>
-                    <div>Uwagi</div> <div style="text-align: center;">Akcje</div>
+                    <div style="text-align: center;">Status</div>
+                    <div>Uwagi</div>
+                    <div style="text-align: center;">Akcje</div>
                 </div>
                 <div id="data-list">Ładowanie danych...</div>
             `;
@@ -2844,14 +2857,15 @@
                     return;
                 }
 
-                // --- POBIERAMY ROLĘ ---
                 const userRole = localStorage.getItem('user_role');
+
+                // 1. POBIERAMY DZISIEJSZĄ DATĘ (Format YYYY-MM-DD) do porównań
+                const today = new Date().toISOString().split('T')[0];
 
                 handovers.forEach((item, index) => {
                     const row = document.createElement('div');
                     row.className = 'table-row';
 
-                    // Stylizacja wiersza
                     row.style.display = 'grid';
                     row.style.gridTemplateColumns = gridLayout;
                     row.style.gap = '10px';
@@ -2860,15 +2874,37 @@
                     row.style.fontSize = '0.85em';
                     row.style.alignItems = 'center';
 
-                    // Logika koloru dla daty zwrotu
-                    const zwrotText = item.data_zwrotu || '<span style="color: green; font-weight: bold;">W użytku</span>';
+                    // --- LOGIKA STATUSÓW (POPRAWIONA) ---
+                    let statusHtml = '';
 
-                    // --- UKRYWANIE PRZYCISKÓW DLA KIEROWCY ---
+                    // Sprawdzamy czy wpisano przebieg końcowy (czy auto fizycznie wróciło)
+                    const isReturned = (item.przebieg_stop !== null && item.przebieg_stop > 0);
+
+                    // Pobieramy planowaną datę zwrotu
+                    const planDate = item.data_zwrotu;
+
+                    if (isReturned) {
+                        // WARUNEK 1: Auto oddane (wpisany licznik) -> ZAKOŃCZONE
+                        statusHtml = '<span style="background:#d4edda; color:#155724; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.85em;">ZAKOŃCZONE</span>';
+                    } else {
+                        // Auto NIE oddane (brak licznika). Sprawdzamy datę.
+                        if (planDate && planDate < today) {
+                            // WARUNEK 2: Data minęła -> PO TERMINIE
+                            statusHtml = '<span style="background:#f8d7da; color:#721c24; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.85em;">PO TERMINIE</span>';
+                        } else {
+                            // WARUNEK 3: Data jest dzisiaj lub w przyszłości -> W TRAKCIE
+                            statusHtml = '<span style="background:#cce5ff; color:#004085; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.85em;">W TRAKCIE</span>';
+                        }
+                    }
+
+                    // Wyświetlanie daty (jeśli pusta to myślnik)
+                    let zwrotText = item.data_zwrotu || '<span style="color:#ccc;">-</span>';
+
+                    // Ukrywanie przycisków dla kierowcy
                     let actionButtons = getActionButtons(item, 'handover');
                     if (userRole === 'DRIVER') {
                         actionButtons = '<span style="color:#ccc;">-</span>';
                     }
-                    // -----------------------------------------
 
                     row.innerHTML = `
                         <div>${index + 1}.</div>
@@ -2880,6 +2916,8 @@
                         <div>${item.rejestracja || '-'}</div>
                         <div>${item.data_wydania}</div>
                         <div>${zwrotText}</div>
+
+                        <div style="text-align: center;">${statusHtml}</div>
 
                         <div class="text-ellipsis" title="${item.uwagi || ''}">
                             ${item.uwagi || '-'}
@@ -3484,6 +3522,124 @@
             });
         }
 
+        // ==========================================
+        // MAPA FLOTY (Polska + 200km bufor)
+        // ==========================================
+        let mapInstance = null;
+
+        async function renderMap() {
+            currentView = 'map';
+            viewTitle.textContent = 'Mapa Floty (Polska + Sąsiedzi)';
+
+            const btn = document.getElementById('add-btn');
+            if(btn) btn.style.display = 'none';
+
+            const contentDiv = document.getElementById('main-content');
+            contentDiv.innerHTML = `
+                <div id="map-container" style="width: 100%; height: calc(100vh - 160px); border-radius: 8px; border: 1px solid #ccc; z-index: 1;"></div>
+            `;
+
+            setTimeout(async () => {
+                if (mapInstance) {
+                    mapInstance.remove();
+                    mapInstance = null;
+                }
+
+                try {
+                    // 1. OGRANICZENIE MAPY (Polska + ok. 200km zapasu)
+                    // SW: Okolice Pragi/Drezna, NE: Okolice Wilna/Rygi
+                    const southWest = L.latLng(48.0, 12.0);
+                    const northEast = L.latLng(56.0, 26.0);
+                    const bounds = L.latLngBounds(southWest, northEast);
+
+                    mapInstance = L.map('map-container', {
+                        maxBounds: bounds,       // Nie wyjedziesz poza ten obszar
+                        maxBoundsViscosity: 1.0, // "Twarda" granica (odbija od krawędzi)
+                        minZoom: 6,              // Nie oddalisz bardziej niż widok kraju
+                        maxZoom: 18
+                    }).setView([52.06, 19.25], 6); // Start: Środek Polski
+
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; OpenStreetMap contributors'
+                    }).addTo(mapInstance);
+
+                    const vehicles = await fetchVehicles();
+
+                    if (vehicles.length === 0) {
+                        L.popup().setLatLng([52.06, 19.25]).setContent("Brak pojazdów.").openOn(mapInstance);
+                        return;
+                    }
+
+                    // Generator liczb pseudolosowych (stały dla danego ID)
+                    function pseudoRandom(seed) {
+                        var x = Math.sin(seed) * 10000;
+                        return x - Math.floor(x);
+                    }
+
+                    vehicles.forEach(v => {
+                        let lat, lng;
+
+                        // 2. LOGIKA LOKALIZACJI
+                        if (v.status === 'NIESPRAWNY' || v.status === 'SERWIS') {
+                            // --- WARIANT A: Wszystkie niesprawne w Warszawie ---
+                            // Baza: Warszawa (52.23, 21.01)
+                            // Dodajemy minimalny rozrzut (0.02 stopnia), żeby widzieć ile ich stoi,
+                            // a nie że są wszystkie w jednym punkcie.
+                            const scatterLat = (pseudoRandom(v.id) - 0.5) * 0.05;
+                            const scatterLng = (pseudoRandom(v.id + 99) - 0.5) * 0.05;
+
+                            lat = 52.23 + scatterLat;
+                            lng = 21.01 + scatterLng;
+
+                        } else {
+                            // --- WARIANT B: Reszta jeździ po Polsce/Sąsiadach ---
+                            const rand1 = pseudoRandom(v.id * 12.9898);
+                            const rand2 = pseudoRandom(v.id * 78.233 + 100);
+
+                            // Zakres losowania (Szeroki obszar Polski)
+                            lat = 49.0 + (rand1 * (54.8 - 49.0));
+                            lng = 14.5 + (rand2 * (23.5 - 14.5));
+                        }
+
+                        // 3. KOLORY I IKONY
+                        let color = '#007bff'; // Niebieski (Domyślny)
+                        if (v.status === 'NIESPRAWNY' || v.status === 'SERWIS') color = '#dc3545'; // Czerwony
+                        if (v.status === 'WYPOZYCZONY') color = '#28a745'; // Zielony
+
+                        const iconHtml = `
+                            <div style="background-color:${color}; width:24px; height:24px; border-radius:50%; border:2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center;">
+                                <div style="color:white; font-size:10px;">
+                                    <i class="fas fa-car"></i>
+                                </div>
+                            </div>
+                        `;
+
+                        const customIcon = L.divIcon({
+                            className: 'custom-pin',
+                            html: iconHtml,
+                            iconSize: [24, 24],
+                            iconAnchor: [12, 12]
+                        });
+
+                        const marker = L.marker([lat, lng], { icon: customIcon }).addTo(mapInstance);
+
+                        marker.bindPopup(`
+                            <div class="custom-map-popup">
+                                <b style="font-size:1.1em; color:#2c3e50;">${v.registration_number}</b>
+                                <div style="font-size:0.9em; margin-bottom:5px;">${v.marka} ${v.model}</div>
+                                <div>Status: <strong style="color:${color}">${v.status}</strong></div>
+                                ${v.status === 'NIESPRAWNY' ? '<div style="color:#dc3545; font-size:0.8em;">📍 Lokalizacja: Serwis Centralny (WAW)</div>' : ''}
+                            </div>
+                        `);
+                    });
+
+                } catch (e) {
+                    console.error("Mapa Error:", e);
+                    contentDiv.innerHTML = `<div class="error">Błąd mapy: ${e.message}</div>`;
+                }
+            }, 100);
+        }
+
         async function renderCalendar() {
             currentView = 'calendar';
             viewTitle.textContent = 'Terminarz Floty';
@@ -3619,6 +3775,7 @@
             'reservations': renderReservations,
             'vehicle_documents': renderVehicleDocsList,
             'vehicle_history': () => renderVehicleHistory(),
+            'map': renderMap,
 
             // --- NAPRAWIONE ZAKŁADKI SERWISOWE ---
             // Teraz wywołują funkcję renderServiceEvents z odpowiednim filtrem
