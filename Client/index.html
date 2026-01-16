@@ -1187,6 +1187,7 @@
 
 
         /** Otwiera modal i ładuje odpowiedni formularz */
+       /** Otwiera modal i ładuje odpowiedni formularz */
        async function openModal(viewName, recordOrId = null) {
              let record = null;
              modalError.textContent = '';
@@ -1224,12 +1225,6 @@
              if (currentRecordId) {
                  deleteBtn.style.display = 'inline';
              } else {
-                 deleteBtn.style.display = 'none';
-             }
-
-             // WYJĄTEK: Kierowca w Przekazaniach nie widzi przycisku USUŃ
-             const role = localStorage.getItem('user_role');
-             if (role === 'DRIVER' && viewName === 'handover') {
                  deleteBtn.style.display = 'none';
              }
 
@@ -1371,12 +1366,10 @@
                      if (dRes.ok) drivers = await dRes.json();
                  } catch (e) { console.error("Błąd pobierania słowników:", e); }
 
-                 // 2. GENEROWANIE OPCJI POJAZDÓW (Z DODANYM ATRYBUTEM data-przebieg)
+                 // 2. GENEROWANIE OPCJI POJAZDÓW
                  const vehicleOptions = vehicles.map(v => {
                      const isSelected = (record && record.pojazd === v.id) ? 'selected' : '';
                      const label = `${v.marka} ${v.model} - ${v.registration_number} (ID: ${v.id})`;
-
-                     // TU ZMIANA: Dodajemy data-przebieg
                      return `<option value="${v.id}" data-przebieg="${v.przebieg}" ${isSelected}>${label}</option>`;
                  }).join('');
 
@@ -1410,18 +1403,12 @@
                      ).join('');
                  };
 
-                 // --- NOWA FUNKCJA: AUTO-UZUPEŁNIANIE PRZEBIEGU ---
                  window.updateStartMileage = (selectElement) => {
-                     // Pobieramy wybraną opcję
                      const selectedOption = selectElement.options[selectElement.selectedIndex];
-                     // Odczytujemy przebieg z atrybutu data-przebieg
                      const mileage = selectedOption.getAttribute('data-przebieg');
-
-                     // Jeśli przebieg istnieje i pole input jest dostępne -> wpisujemy
                      const inputStart = document.getElementById('h_przebieg_start');
                      if (mileage && inputStart) {
                          inputStart.value = mileage;
-                         // Przeliczamy koszty od razu, bo zmienił się start
                          if (window.calculateRentCost) window.calculateRentCost();
                      }
                  };
@@ -1440,7 +1427,6 @@
                      }
                  };
 
-                 // --- GŁÓWNY HTML FORMULARZA ---
                  formHtml = `
                      <div style="display:flex; gap:10px;">
                          <div style="flex:1;">
@@ -1497,7 +1483,7 @@
                      </div>
                  `;
 
-                 // Wywołaj kalkulację po załadowaniu (jeśli edytujemy)
+                 // Wywołaj kalkulację po załadowaniu
                  setTimeout(window.calculateRentCost, 500);
              }
              // 2.5 SZKODY (TUTAJ ZACHODZĄ ZMIANY DLA KIEROWCY)
@@ -1506,16 +1492,10 @@
                  const userRole = localStorage.getItem('user_role');
 
                  try {
-                     // 1. Wybierz odpowiedni endpoint:
-                     // - Kierowca: widzi tylko SWOJE auta (api/vehicles/my_list/)
-                     // - Admin/Logistyka: widzi WSZYSTKIE auta (api/vehicles/)
                      const endpoint = (userRole === 'DRIVER') ? 'vehicles/my_list/' : 'vehicles/';
-
                      const res = await fetch(API_BASE + endpoint, { headers: getAuthHeaders() });
                      if (res.ok) {
                          const vehicles = await res.json();
-
-                         // Jeśli kierowca nie ma aut, dodaj informację
                          if (vehicles.length === 0) {
                              vehicleOptions = '<option value="" disabled>-- Brak przypisanych pojazdów --</option>';
                          } else {
@@ -1551,7 +1531,6 @@
              }
              // 2.6 REZERWACJE
              else if (viewName === 'reservations') {
-                 // 1. POBIERANIE LISTY POJAZDÓW
                  let vehicleOptions = '<option value="">-- Brak / Dowolny --</option>';
                  try {
                      const vehicles = await fetchVehicles();
@@ -1567,7 +1546,6 @@
                      }).join('');
                  } catch (e) { console.error(e); }
 
-                 // 2. POBIERANIE LISTY KIEROWCÓW
                  let driverOptions = '<option value="">-- Wybierz Użytkownika z Systemu --</option>';
                  try {
                      const response = await fetch(API_BASE + 'drivers/', { headers: getAuthHeaders() });
@@ -1658,15 +1636,11 @@
                      ${attachmentsHtml}
                  `;
 
-                 // --- KLUCZOWA POPRAWKA ---
-                 // Najpierw wstawiamy HTML do strony, żeby elementy istniały
+                 // Blokada dla kierowcy w rezerwacjach
                  modalForm.innerHTML = formHtml;
-
-                 // Dopiero teraz blokujemy pola (bo już istnieją)
                  const userRole = localStorage.getItem('user_role');
                  if (userRole === 'DRIVER') {
                      const fieldsToLock = ['r_driver_id', 'r_assigned_vehicle', 'r_status'];
-
                      fieldsToLock.forEach(id => {
                          const field = document.getElementById(id);
                          if (field) {
@@ -1682,7 +1656,6 @@
                      setTimeout(updateVehicleAvailability, 200);
                  }
 
-                 // Ponieważ to jest funkcja async i robimy "własny" rendering, musimy ręcznie pokazać modal i przerwać dalsze wykonywanie
                  modal.style.display = "block";
                  return;
              }
@@ -1752,6 +1725,25 @@
 
              // 3.1 Logika dla KIEROWCY (Driver)
              if (userRole === 'DRIVER') {
+
+                // Blokada edycji Wydania w Przekazaniach (Twoja nowa prośba)
+                if (viewName === 'handover') {
+                    const idsToLock = [
+                        'h_pojazd_id',
+                        'h_kierowca_id',
+                        'h_data_wydania',
+                        'h_przebieg_start',
+                        'h_paliwo_start'
+                    ];
+                    idsToLock.forEach(id => {
+                        const el = document.getElementById(id);
+                        if(el) {
+                            el.disabled = true;
+                            el.style.backgroundColor = "#e9ecef";
+                        }
+                    });
+                }
+
                 if (viewName === 'damages') {
                     if (deleteBtn) deleteBtn.style.display = 'none';
                     const statusSelect = document.getElementById('status_naprawy_val');
@@ -2818,7 +2810,7 @@
             currentView = 'handover';
             viewTitle.textContent = 'Przekazania Pojazdów';
 
-            // Grid: 12 kolumn (dodana kolumna Status - 120px)
+            // Grid: 12 kolumn (Lp, Imie, Nazwisko, Firma, Marka, Model, Rej, Wydanie, Zwrot, Status, Uwagi, Akcje)
             const gridLayout = "40px 100px 110px 100px 100px 100px 100px 110px 110px 120px 1fr 100px";
 
             mainContent.innerHTML = `
@@ -2857,9 +2849,7 @@
                     return;
                 }
 
-                const userRole = localStorage.getItem('user_role');
-
-                // 1. POBIERAMY DZISIEJSZĄ DATĘ (Format YYYY-MM-DD) do porównań
+                // Pobieramy dzisiejszą datę do statusów
                 const today = new Date().toISOString().split('T')[0];
 
                 handovers.forEach((item, index) => {
@@ -2874,37 +2864,27 @@
                     row.style.fontSize = '0.85em';
                     row.style.alignItems = 'center';
 
-                    // --- LOGIKA STATUSÓW (POPRAWIONA) ---
+                    // --- LOGIKA STATUSÓW (Twoja oryginalna logika) ---
                     let statusHtml = '';
-
-                    // Sprawdzamy czy wpisano przebieg końcowy (czy auto fizycznie wróciło)
                     const isReturned = (item.przebieg_stop !== null && item.przebieg_stop > 0);
-
-                    // Pobieramy planowaną datę zwrotu
                     const planDate = item.data_zwrotu;
 
                     if (isReturned) {
-                        // WARUNEK 1: Auto oddane (wpisany licznik) -> ZAKOŃCZONE
                         statusHtml = '<span style="background:#d4edda; color:#155724; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.85em;">ZAKOŃCZONE</span>';
                     } else {
-                        // Auto NIE oddane (brak licznika). Sprawdzamy datę.
                         if (planDate && planDate < today) {
-                            // WARUNEK 2: Data minęła -> PO TERMINIE
                             statusHtml = '<span style="background:#f8d7da; color:#721c24; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.85em;">PO TERMINIE</span>';
                         } else {
-                            // WARUNEK 3: Data jest dzisiaj lub w przyszłości -> W TRAKCIE
                             statusHtml = '<span style="background:#cce5ff; color:#004085; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.85em;">W TRAKCIE</span>';
                         }
                     }
 
-                    // Wyświetlanie daty (jeśli pusta to myślnik)
                     let zwrotText = item.data_zwrotu || '<span style="color:#ccc;">-</span>';
 
-                    // Ukrywanie przycisków dla kierowcy
+                    // --- OBSŁUGA PRZYCISKÓW (EDYTUJ) ---
+                    // Wywołujemy getActionButtons, która ma w sobie logikę:
+                    // "Jeśli viewName to 'handover' i rola to 'DRIVER' -> pokaż Edytuj, ukryj Usuń"
                     let actionButtons = getActionButtons(item, 'handover');
-                    if (userRole === 'DRIVER') {
-                        actionButtons = '<span style="color:#ccc;">-</span>';
-                    }
 
                     row.innerHTML = `
                         <div>${index + 1}.</div>
