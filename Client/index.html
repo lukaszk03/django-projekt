@@ -679,9 +679,8 @@
                 readOnly: true // Domyślnie wszystko zablokowane (ale zrobimy wyjątek dla plików)
             },
             'DRIVER': {
-            // Kierowca widzi Pojazdy (tylko swoje), Rezerwacje (swoje), Kalendarz i Szkody
-            allowed: ['vehicles','handover', 'reservations', 'damages'],
-            readOnly: false // Musi być false, żeby mógł np. dodać rezerwację
+                allowed: ['vehicles', 'reservations', 'calendar', 'damages', 'vehicle_history', 'handover'],
+                readOnly: false
             }
         };
 
@@ -1209,7 +1208,25 @@
              }
 
              modalTitle.textContent = currentRecordId ? `Edytuj rekord (${viewName})` : `Dodaj nowy rekord (${viewName})`;
-             deleteBtn.style.display = currentRecordId ? 'inline' : 'none';
+
+             // Domyślne ustawienie przycisku USUŃ
+             if (currentRecordId) {
+                 deleteBtn.style.display = 'inline';
+             } else {
+                 deleteBtn.style.display = 'none';
+             }
+
+             // WYJĄTEK: Kierowca w Przekazaniach nie widzi przycisku USUŃ
+             const role = localStorage.getItem('user_role');
+             if (role === 'DRIVER' && viewName === 'handover') {
+                 deleteBtn.style.display = 'none';
+             }
+
+             // --- ZABEZPIECZENIE: Ukryj przycisk USUŃ dla Kierowcy w Przekazaniach ---
+             const currentUserRole = localStorage.getItem('user_role');
+             if (currentUserRole === 'DRIVER' && viewName === 'handover') {
+                 deleteBtn.style.display = 'none';
+             }
 
              let formHtml = '';
              const isCalendarEventView = ['calendar', 'policies', 'tech_inspections', 'reviews', 'repairs', 'legalization', 'inspection'].includes(viewName);
@@ -1630,9 +1647,33 @@
                      ${attachmentsHtml}
                  `;
 
+                 // --- KLUCZOWA POPRAWKA ---
+                 // Najpierw wstawiamy HTML do strony, żeby elementy istniały
+                 modalForm.innerHTML = formHtml;
+
+                 // Dopiero teraz blokujemy pola (bo już istnieją)
+                 const userRole = localStorage.getItem('user_role');
+                 if (userRole === 'DRIVER') {
+                     const fieldsToLock = ['r_driver_id', 'r_assigned_vehicle', 'r_status'];
+
+                     fieldsToLock.forEach(id => {
+                         const field = document.getElementById(id);
+                         if (field) {
+                             field.disabled = true;
+                             field.style.backgroundColor = '#e9ecef';
+                             field.style.cursor = 'not-allowed';
+                             field.title = "Tylko dla Dyspozytora";
+                         }
+                     });
+                 }
+
                  if (record && record.date_from && record.date_to) {
                      setTimeout(updateVehicleAvailability, 200);
                  }
+
+                 // Ponieważ to jest funkcja async i robimy "własny" rendering, musimy ręcznie pokazać modal i przerwać dalsze wykonywanie
+                 modal.style.display = "block";
+                 return;
              }
              // 2.7 EDYCJA ISTNIEJĄCYCH ZDARZEŃ (POLISY, BADANIA, NAPRAWY)
              else if (isCalendarEventView && currentRecordId) {
@@ -2102,41 +2143,73 @@
         }
 
         function getActionButtons(record, viewName) {
-            // 1. Jeśli tryb tylko do odczytu (np. Księgowość)
-            if (IS_READ_ONLY) {
+            const id = record.id;
+            // Pobieramy rolę, usuwamy spacje i zamieniamy na duże litery dla pewności
+            const userRoleRaw = localStorage.getItem('user_role');
+            const userRole = userRoleRaw ? userRoleRaw.trim().toUpperCase() : '';
+
+            // ============================================================
+            // 1. ABSOLUTNY PRIORYTET: ZAKŁADKA PRZEKAZANIA (HANDOVER)
+            // ============================================================
+            // Ta sekcja musi być PIERWSZA. Omija blokadę "Tylko do odczytu".
+            if (viewName === 'handover') {
+
+                // Domyślnie pokazujemy USUŃ
+                let showDelete = true;
+
+                // Jeśli to KIEROWCA -> ukrywamy USUŃ (zostaje tylko Edytuj)
+                if (userRole === 'DRIVER') {
+                    showDelete = false;
+                }
+
+                // Generujemy przyciski i robimy RETURN, żeby reszta funkcji się nie wykonała
+                return `
+                    <div class="action-buttons" style="display: flex; gap: 8px; justify-content: center;">
+                        <button class="btn-edit"
+                                onclick="openModal('${viewName}', ${id})"
+                                style="cursor: pointer; padding: 5px 12px; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 4px;">
+                            Edytuj
+                        </button>
+                        ${showDelete ? `
+                        <button class="btn-delete"
+                                onclick="deleteRecord('${viewName}', ${id})"
+                                style="cursor: pointer; padding: 5px 12px; background-color: #ff4d4d; color: white; border: none; border-radius: 4px;">
+                            Usuń
+                        </button>` : ''}
+                    </div>
+                `;
+            }
+
+            // ============================================================
+            // 2. STANDARDOWA LOGIKA DLA INNYCH ZAKŁADEK
+            // ============================================================
+
+            // Dopiero tutaj sprawdzamy blokadę edycji (np. dla Księgowości)
+            if (typeof IS_READ_ONLY !== 'undefined' && IS_READ_ONLY) {
                 return '<span style="color:#999; font-size:0.8em; font-style:italic;">Podgląd</span>';
             }
 
-            const id = record.id;
-            const userRole = localStorage.getItem('user_role');
+            // Domyślne przyciski dla reszty zakładek
+            let showDeleteForOthers = true;
 
-            // 2. Definiujemy przyciski (ze stylami z Twojego oryginału)
-            const btnEdit = `
-                <button class="btn-edit"
-                        onclick="openModal('${viewName}', ${id})"
-                        style="cursor: pointer; padding: 5px 12px; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 4px;">
-                    Edytuj
-                </button>
-            `;
-
-            let btnDelete = `
-                <button class="btn-delete"
-                        onclick="deleteRecord('${viewName}', ${id})"
-                        style="cursor: pointer; padding: 5px 12px; background-color: #ff4d4d; color: white; border: none; border-radius: 4px;">
-                    Usuń
-                </button>
-            `;
-
-            // 3. WARUNEK: Jeśli to KIEROWCA i zakładka SZKODY -> ukrywamy przycisk Usuń
+            // Wyjątek: Kierowca nie usuwa Szkód
             if (userRole === 'DRIVER' && viewName === 'damages') {
-                btnDelete = ''; // Pusty ciąg znaków = brak przycisku
+                showDeleteForOthers = false;
             }
 
-            // 4. Składamy całość
             return `
                 <div class="action-buttons" style="display: flex; gap: 8px; justify-content: center;">
-                    ${btnEdit}
-                    ${btnDelete}
+                    <button class="btn-edit"
+                            onclick="openModal('${viewName}', ${id})"
+                            style="cursor: pointer; padding: 5px 12px; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 4px;">
+                        Edytuj
+                    </button>
+                    ${showDeleteForOthers ? `
+                    <button class="btn-delete"
+                            onclick="deleteRecord('${viewName}', ${id})"
+                            style="cursor: pointer; padding: 5px 12px; background-color: #ff4d4d; color: white; border: none; border-radius: 4px;">
+                        Usuń
+                    </button>` : ''}
                 </div>
             `;
         }
