@@ -82,7 +82,7 @@ def get_all_history_vehicle_ids(user):
     return list(vehicle_ids)
 
 
-# 1. WIDOK DLA POJAZDÓW (Używa Funkcji 1 - tylko aktualne)
+# 1. WIDOK DLA POJAZDÓW
 class VehicleViewSet(viewsets.ModelViewSet):
     serializer_class = VehicleDto
 
@@ -112,7 +112,7 @@ class VehicleViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(vehicles, many=True)
         return Response(serializer.data)
 
-    # Historia pojazdu (bez zmian)
+    # Historia pojazdu
     @action(detail=True, methods=['get'])
     def history(self, request, pk=None):
         vehicle = self.get_object()
@@ -177,25 +177,21 @@ class VehicleViewSet(viewsets.ModelViewSet):
         return Response(data)
 
 
-# 2. WIDOK SZKÓD (NAPRAWIONY - Używa Funkcji 2 - cała historia)
+# 2. WIDOK SZKÓD
 class DamageEventViewSet(viewsets.ModelViewSet):
     serializer_class = DamageEventDto
 
     def get_queryset(self):
         user = self.request.user
-        # Admin widzi wszystko
-        queryset = DamageEvent.objects.all()
+        queryset = DamageEvent.objects.all().order_by('-data_zdarzenia')
 
         if user.is_authenticated and hasattr(user, 'rola') and user.rola == 'DRIVER':
-            # Kierowca widzi szkody wszystkich aut, którymi KIEDYKOLWIEK jeździł
-            # Dzięki temu widzi szkodę nawet po oddaniu auta.
             history_ids = get_all_history_vehicle_ids(user)
             queryset = queryset.filter(pojazd_id__in=history_ids)
 
         return queryset
 
 
-# POZOSTAŁE WIDOKI (BEZ ZMIAN)
 class DriverViewSet(viewsets.ModelViewSet):
     queryset = Driver.objects.all()
     serializer_class = DriverDto
@@ -240,6 +236,7 @@ class ServiceEventViewSet(viewsets.ModelViewSet):
     serializer_class = ServiceEventDto
 
 
+# --- ULEPSZONA KLASA REZERWACJI ---
 class ReservationViewSet(viewsets.ModelViewSet):
     serializer_class = ReservationDto
 
@@ -249,7 +246,59 @@ class ReservationViewSet(viewsets.ModelViewSet):
             return Reservation.objects.filter(driver__user=user)
         return Reservation.objects.all().order_by('-created_at')
 
+    def _create_handover_if_approved(self, instance):
+        """Wspólna logika dla create i update z dokładnymi logami"""
+        print(f"--- DEBUG REZERWACJI ID={instance.id} ---")
+        print(f"Status: {instance.status}")
+        print(f"Pojazd: {instance.assigned_vehicle}")
+        print(f"Kierowca: {instance.driver}")
 
+        # 1. Sprawdzenie statusu
+        if instance.status != 'ZATWIERDZONE':
+            print("DEBUG: Status nie jest ZATWIERDZONE. Pomijam tworzenie przekazania.")
+            return
+
+        # 2. Sprawdzenie danych
+        if not instance.assigned_vehicle:
+            print("DEBUG: BŁĄD - Brak przypisanego POJAZDU! Przekazanie nie zostanie utworzone.")
+            return
+
+        if not instance.driver:
+            print("DEBUG: BŁĄD - Brak przypisanego KIEROWCY! Przekazanie nie zostanie utworzone.")
+            return
+
+        # 3. Sprawdzenie duplikatów
+        if VehicleHandover.objects.filter(reservation=instance).exists():
+            print("DEBUG: Przekazanie dla tej rezerwacji już istnieje.")
+            return
+
+        # 4. Próba utworzenia
+        try:
+            # Pobieramy aktualny przebieg auta, żeby wpisać go jako startowy
+            start_mileage = int(instance.assigned_vehicle.przebieg) if instance.assigned_vehicle else 0
+
+            VehicleHandover.objects.create(
+                kierowca=instance.driver,
+                pojazd=instance.assigned_vehicle,
+                reservation=instance,
+                data_wydania=instance.date_from,
+                data_zwrotu=instance.date_to,
+                przebieg_start=start_mileage,  # <-- Dodano automatyczny przebieg
+                uwagi=f"Automatycznie z rezerwacji (ID: {instance.id})."
+            )
+            print(f"DEBUG: SUKCES! Utworzono przekazanie.")
+        except Exception as e:
+            print(f"DEBUG: WYJĄTEK przy tworzeniu przekazania: {e}")
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        self._create_handover_if_approved(instance)
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        self._create_handover_if_approved(instance)
+
+# --- BRAKUJĄCA KLASA (DODANA) ---
 class VehicleDocumentViewSet(viewsets.ModelViewSet):
     serializer_class = VehicleDocumentDto
 
