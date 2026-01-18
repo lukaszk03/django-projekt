@@ -178,6 +178,7 @@ class VehicleViewSet(viewsets.ModelViewSet):
 
 
 # 2. WIDOK SZKÓD
+# 2. WIDOK SZKÓD (Z AUTOMATYCZNĄ ZMIANĄ STATUSU POJAZDU)
 class DamageEventViewSet(viewsets.ModelViewSet):
     serializer_class = DamageEventDto
 
@@ -190,6 +191,35 @@ class DamageEventViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(pojazd_id__in=history_ids)
 
         return queryset
+
+    # --- METODA POMOCNICZA AKTUALIZUJĄCA STATUS ---
+    def _update_vehicle_status(self, vehicle):
+        # Sprawdzamy, czy auto ma jakiekolwiek OTWARTE szkody
+        ma_aktywne_szkody = DamageEvent.objects.filter(
+            pojazd=vehicle,
+            status_naprawy__in=['ZGLOSZONA', 'W_NAPRAWIE']
+        ).exists()
+
+        if ma_aktywne_szkody:
+            vehicle.status = 'NIESPRAWNY'
+        else:
+            # Jeśli nie ma szkód, przywracamy status (Sprawny lub Wypożyczony)
+            if vehicle.assigned_user:
+                vehicle.status = 'WYPOZYCZONY'
+            else:
+                vehicle.status = 'SPRAWNY'
+
+        vehicle.save()
+
+    # Uruchamia się przy DODAWANIU szkody
+    def perform_create(self, serializer):
+        damage = serializer.save()
+        self._update_vehicle_status(damage.pojazd)
+
+    # Uruchamia się przy EDYCJI szkody (np. zmiana statusu na ZAMKNIETA)
+    def perform_update(self, serializer):
+        damage = serializer.save()
+        self._update_vehicle_status(damage.pojazd)
 
 
 class DriverViewSet(viewsets.ModelViewSet):
